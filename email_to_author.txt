@@ -1,0 +1,50 @@
+Subject: Request for Data Files and Guidance for HIFIVIM Code Reproduction
+
+Dear Dr. Finkelstein,
+
+I hope this email finds you well. My name is [Your Name], and I am a [Your Position/Affiliation] working on diffusion MRI and IVIM parameter estimation research.
+
+I am writing to request your assistance with reproducing the results from your excellent paper "High-Fidelity Intravoxel Incoherent Motion Parameter Mapping Using Locally Low-Rank and Subspace Modeling" published in NeuroImage (2024). I have been studying your GitHub repository and found the methodology very innovative and well-implemented.
+
+However, I have encountered two specific issues while attempting to reproduce your work:
+
+**1. Missing Basis Files:**
+The code references several basis files that are not included in the repository:
+- `Standard_Files/ivim_basis_2`
+- `Standard_Files/ivim_basis_3`
+- `Standard_Files/ivim_basis_4`
+
+These files appear to be essential for the LLR + Subspace reconstruction algorithm. While I can generate new basis files using `dictionary_gen.py`, I believe using the exact basis files from your study would ensure better reproducibility of your results.
+
+**2. BrainWeb Phantom Data Preprocessing:**
+I downloaded the numerical brain phantom from BrainWeb (https://brainweb.bic.mni.mcgill.ca/), but the downloaded data has dimensions of 181 × 217 × 181, whereas your code appears to expect 164 × 164 × n format. Could you please provide guidance on:
+- Which specific BrainWeb phantom you used
+- The preprocessing steps to convert from 181 × 217 × 181 to 164 × 164 × n
+- Any specific cropping, resampling, or registration procedures
+
+**Request:**
+Would it be possible for you to share:
+1. The standard basis files (`ivim_basis_2`, `ivim_basis_3`, `ivim_basis_4`)
+2. The preprocessed phantom data or detailed preprocessing instructions
+3. Any additional configuration files that might be helpful for reproduction
+
+I completely understand if you cannot share all data due to size constraints or other considerations. Even partial guidance or documentation about the data preparation workflow would be extremely valuable.
+
+**Research Context:**
+I am working on [briefly describe your research context, e.g., "extending IVIM methods for clinical applications" or "comparing different IVIM fitting approaches"], and your LLR + Subspace method represents a significant advancement in the field that I would like to build upon.
+
+I greatly appreciate your time and consideration. Your work has been very inspiring, and I look forward to contributing to this research area. Please let me know if you need any additional information about my research or if there are any specific citation requirements for using your data.
+
+Thank you very much for your pioneering work and for making the code publicly available.
+
+Best regards,
+
+[Your Name]
+[Your Title/Position]
+[Your Institution]
+[Your Email]
+[Your Phone Number (optional)]
+
+---
+
+P.S. I have already successfully set up the Python environment with the required dependencies (BART, Python 3.9, etc.) and can run the basic components of your code. The missing files are the only remaining barrier to full reproduction.
