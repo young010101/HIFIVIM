@@ -1,50 +1,57 @@
-Subject: Request for Data Files and Guidance for HIFIVIM Code Reproduction
+Subject: Request for BrainWeb Phantom Preprocessing Guidance - HIFIVIM Code Reproduction
 
 Dear Dr. Finkelstein,
 
-I hope this email finds you well. My name is [Your Name], and I am a [Your Position/Affiliation] working on diffusion MRI and IVIM parameter estimation research.
+I hope this email finds you well. My name is Yang Cheng, and I am a third-year Master's student at Tianjin University, China. My research focuses on directly generating DTI's 6 D-values from k-space data using advanced reconstruction methods.
 
-I am writing to request your assistance with reproducing the results from your excellent paper "High-Fidelity Intravoxel Incoherent Motion Parameter Mapping Using Locally Low-Rank and Subspace Modeling" published in NeuroImage (2024). I have been studying your GitHub repository and found the methodology very innovative and well-implemented.
+I am writing to request your assistance with reproducing the results from your excellent paper "High-Fidelity Intravoxel Incoherent Motion Parameter Mapping Using Locally Low-Rank and Subspace Modeling" published in NeuroImage (2024). I have been studying your GitHub repository and found the LLR + Subspace methodology very innovative and potentially applicable to my DTI reconstruction research.
 
-However, I have encountered two specific issues while attempting to reproduce your work:
+I have successfully set up the environment and generated the basis files using your `dictionary_gen.py` script. However, I have encountered a specific issue with the BrainWeb phantom data preprocessing:
 
-**1. Missing Basis Files:**
-The code references several basis files that are not included in the repository:
-- `Standard_Files/ivim_basis_2`
-- `Standard_Files/ivim_basis_3`
-- `Standard_Files/ivim_basis_4`
+**BrainWeb Phantom Data Dimensionality Issue:**
+I downloaded the numerical brain phantom from BrainWeb (https://brainweb.bic.mni.mcgill.ca/), but the downloaded data has dimensions of 181 × 217 × 181. However, when I examine the existing phantom files in your repository:
+- `Phantom/phase_estimates.nii.gz`
+- `Phantom/sens_maps.nii.gz`
 
-These files appear to be essential for the LLR + Subspace reconstruction algorithm. While I can generate new basis files using `dictionary_gen.py`, I believe using the exact basis files from your study would ensure better reproducibility of your results.
+These files appear to have 164 × 164 × n dimensions, which don't match the standard BrainWeb format. This dimensional mismatch prevents me from properly running the phantom experiments in your code.
 
-**2. BrainWeb Phantom Data Preprocessing:**
-I downloaded the numerical brain phantom from BrainWeb (https://brainweb.bic.mni.mcgill.ca/), but the downloaded data has dimensions of 181 × 217 × 181, whereas your code appears to expect 164 × 164 × n format. Could you please provide guidance on:
-- Which specific BrainWeb phantom you used
-- The preprocessing steps to convert from 181 × 217 × 181 to 164 × 164 × n
-- Any specific cropping, resampling, or registration procedures
-
-**Request:**
-Would it be possible for you to share:
-1. The standard basis files (`ivim_basis_2`, `ivim_basis_3`, `ivim_basis_4`)
-2. The preprocessed phantom data or detailed preprocessing instructions
-3. Any additional configuration files that might be helpful for reproduction
-
-I completely understand if you cannot share all data due to size constraints or other considerations. Even partial guidance or documentation about the data preparation workflow would be extremely valuable.
+**Specific Questions:**
+1. Which specific BrainWeb phantom dataset did you use (Normal Brain Database, Simulated Brain Database, etc.)?
+2. What are the exact preprocessing steps to convert from the standard BrainWeb format (181 × 217 × 181) to your 164 × 164 format?
+3. Were there specific cropping, resampling, or registration procedures applied?
+4. Are there any orientation or coordinate system transformations involved?
 
 **Research Context:**
-I am working on [briefly describe your research context, e.g., "extending IVIM methods for clinical applications" or "comparing different IVIM fitting approaches"], and your LLR + Subspace method represents a significant advancement in the field that I would like to build upon.
+My thesis work focuses on developing direct k-space to DTI parameter mapping methods, and your LLR + Subspace approach represents a significant methodological advancement that could potentially be adapted for DTI applications. Understanding your phantom preprocessing workflow is crucial for validating my own algorithm development against established benchmarks.
 
-I greatly appreciate your time and consideration. Your work has been very inspiring, and I look forward to contributing to this research area. Please let me know if you need any additional information about my research or if there are any specific citation requirements for using your data.
+**Request:**
+Would it be possible for you to provide:
+1. Detailed preprocessing instructions for converting BrainWeb data to your 164 × 164 format
+2. Information about which specific BrainWeb phantom you used
+3. Any MATLAB or Python scripts used for the preprocessing workflow
+
+I completely understand if you cannot share all preprocessing scripts due to size or complexity constraints. Even high-level guidance or a brief description of the key preprocessing steps would be extremely valuable for my research.
+
+**Current Progress:**
+I have successfully:
+- Set up the Python 3.9 environment with all required dependencies (BART, etc.)
+- Generated the basis files using `dictionary_gen.py`
+- Analyzed your code structure and methodology
+
+The phantom preprocessing guidance is the final piece needed to complete the reproduction and apply insights to my DTI research.
+
+I greatly appreciate your time and consideration. Your work has been very inspiring, and I believe the methodological principles could significantly advance DTI reconstruction from k-space data. Please let me know if you need any additional information about my research or if you would like to discuss potential applications to DTI.
 
 Thank you very much for your pioneering work and for making the code publicly available.
 
 Best regards,
 
-[Your Name]
-[Your Title/Position]
-[Your Institution]
-[Your Email]
-[Your Phone Number (optional)]
+Yang Cheng
+Master's Student (Third Year)
+School of Precision Instruments and Optoelectronics Engineering
+Tianjin University, China
+Email: yc5@tju.edu.cn
 
 ---
 
-P.S. I have already successfully set up the Python environment with the required dependencies (BART, Python 3.9, etc.) and can run the basic components of your code. The missing files are the only remaining barrier to full reproduction.
+P.S. If you are interested in potential collaborations or discussions about extending LLR+Subspace methods to DTI applications, I would be very honored to explore such opportunities.
