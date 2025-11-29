@@ -71,9 +71,11 @@ def make_phantom(args, show=True):
 
     Dt, Fp, Dp = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
     phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], 15))
+    # todo: 为什么需要 mask？
     WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(Dt), np.zeros_like(Dt), \
                                               np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt)
 
+    # todo: center 是做什么的？
     center = (45,100)
     height, width = phantom.shape
 
