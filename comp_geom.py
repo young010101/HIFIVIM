@@ -64,6 +64,8 @@ n_comp = 11
 comp_geom=bart(1, f'phantom -T -x{n_x} -b')
 # %%
 print(comp_geom.shape)
+print(comp_geom.max())
+print(comp_geom.min())
 # %%
 TR=0.0034
 REP=400
@@ -80,7 +82,19 @@ plt.plot(np.squeeze(np.real_if_close(comp_water)))
 # %%
 _comp_tubes=bart(1, f'signal -F -I -r{TR} -n{REP} -1 {0.5}:{2}:{3} -2 {0.005}:{0.2}:{3}')
 # %%
+print(_comp_tubes.shape)
+print(_comp_tubes.min())
+print(_comp_tubes.max())
+# %%
 comp_tubes=bart(1, f'reshape {bitmask([6, 7])} 9 1', _comp_tubes)
+# %%
+def plt_comp_tubes(line,ax):
+    ax.plot(np.real_if_close(line))
+comp_tubes_squeeze = comp_tubes.squeeze()
+n=comp_tubes_squeeze.shape[-1]
+fig, axes = plt.subplots(nrows=n, figsize=(3, 3 * n))
+for i in range(n):
+    plt_comp_tubes(comp_tubes_squeeze[:,i], axes[i])
 # %%
 comp_simu=bart(1, f'join 6', comp_water, comp_tubes, comp_water)
 
@@ -88,13 +102,16 @@ comp_simu=bart(1, f'join 6', comp_water, comp_tubes, comp_water)
 phantom=bart(1, f'fmac -s {bitmask([6])}', comp_geom, comp_simu)
 
 # %%
-phantom.shape
+print(phantom.shape)
+print(phantom.max())
+print(phantom.min())
+
 # %%
 t = (0, 100, 150, 200, 300, 399)
 show_timesteps(phantom, t)
 # %%
 _slices = phantom.squeeze()[:,:, t]
-slices = np.transpose(_slices, (2, 0, 1)).reshape(n_x, n_x * len(t))
+slices = np.transpose(_slices, (2, 0, 1)).reshape(n_x * len(t), n_x)
 # %%
 plt.imshow(np.abs(slices), cmap='gray')
 plt.axis('off')
