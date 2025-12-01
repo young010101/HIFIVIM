@@ -26,7 +26,19 @@ path_t1_icbm='../local/t1_icbm_normal_1mm_pn3_rf20.mnc.gz'
 t1_icbm_normal_img = nib.load(path_t1_icbm)
 t1_icbm_normal=t1_icbm_normal_img.get_fdata()
 # %%
-nib.save(t1_icbm_normal_img,'../local/t1_icbm_normal_1mm_pn3_rf20.nii.gz')
+# nib.save(t1_icbm_normal_img,'../local/t1_icbm_normal_1mm_pn3_rf20.nii.gz')
+
+def brainweb_to_ras(data):
+    # data shape: (181, 217, 181)  # (Z:脚→头, Y:后→前, X:左→右)
+    data = np.rot90(data, k=1, axes=(0, 2))   # 先绕Y轴转90° → 冠状
+    data = np.flip(data, axis=0)              # 上下翻转
+    data = np.flip(data, axis=2)              # 左右翻转（可选，根据需要）
+    return data
+
+data_ras = brainweb_to_ras(t1_icbm_normal)
+
+path_t1_icbm_data_ras='../local/t1_icbm_ras.nii.gz'
+nib.save(nib.Nifti1Image(data_ras, affine=t1_icbm_normal_img.affine),path_t1_icbm_data_ras)
 #%%
 plt.imshow(abs(t1_icbm_normal[90,:,:]))
 # %%===================phase==========================
@@ -37,6 +49,8 @@ print(phase_esti.shape)
 print(phase_esti.max())
 print(phase_esti.min())
 plt.imshow(abs(phase_esti[:,:,0]))
+plt.figure()
+plt.imshow(np.angle(phase_esti[:,:,0]))
 plt.colorbar()
 fig, axes = plt.subplots(ncols=5, nrows=3)
 for i, ax in enumerate(axes.flat):
@@ -70,7 +84,7 @@ slice_index=90
 fixed_3d = sitk.ReadImage('../Phantom/phase_estimates.nii.gz', sitk.sitkFloat32)
 
 path_t1_icbm_nii='../local/t1_icbm_normal_1mm_pn3_rf20.nii.gz'
-moving_3d = sitk.ReadImage(path_t1_icbm_nii, sitk.sitkFloat32)
+moving_3d = sitk.ReadImage(path_t1_icbm_data_ras, sitk.sitkFloat32)
 fixed_2d = fixed_3d[:,:,0]
 moving_2d = moving_3d[:,:,slice_index]
 fixed=fixed_2d
