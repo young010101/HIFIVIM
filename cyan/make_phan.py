@@ -45,6 +45,106 @@ WMH_mask3[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
 # %%
 plt.imshow(phantom * (np.ones_like(Dt) - WMH_mask1 - WMH_mask2 - WMH_mask3))
 plt.colorbar()
+
+# %%
+sq_mask=np.zeros_like(Dt)
+sq_mask[62:103,65:101]=1
+plt.imshow(phantom * sq_mask)
+
+# %%
+import SimpleITK as sitk
+output_2d_path = 'T2_slice85_to_T1_slice85.nii.gz'
+slice_index=90
+fixed_3d = sitk.ReadImage('./Phantom/phase_estimates.nii.gz', sitk.sitkFloat32)
+moving_3d = sitk.ReadImage('./Phantom/Phantom_T1.nii.gz', sitk.sitkFloat32)
+fixed_2d = fixed_3d[:,:,0]
+moving_2d = moving_3d[:,:,slice_index]
+fixed=fixed_2d
+moving=moving_2d
+# %%
+print(fixed.GetDimension())
+print(fixed.GetSize())
+print(fixed.GetSpacing())
+print(fixed.GetDirection())
+print(moving.GetDimension())
+print(moving.GetSize())
+print(moving.GetSpacing())
+print(moving.GetDirection())
+#%%
+# sitk.Show(fixed)
+
+#%% Step1: 刚性+仿射（快速对齐）
+transform = sitk.CenteredTransformInitializer(fixed, moving, 
+                                                        sitk.Euler2DTransform(), 
+                                                        sitk.CenteredTransformInitializerFilter.GEOMETRY)
+# %%
+reg = sitk.ImageRegistrationMethod()
+reg.SetMetricAsMattesMutualInformation(50)
+reg.SetOptimizerAsGradientDescent(learningRate=2.0, numberOfIterations=200)
+reg.SetOptimizerScalesFromPhysicalShift()
+reg.SetInitialTransform(transform, inPlace=False)
+reg.SetInterpolator(sitk.sitkLinear)
+
+final_transform = reg.Execute(fixed_2d, moving_2d)
+
+# 5. 重采样
+warped_2d = sitk.Resample(moving_2d, fixed_2d, final_transform,
+                          sitk.sitkLinear, 0.0, moving_2d.GetPixelID())
+
+# 6. 保存 + 可视化
+sitk.WriteImage(warped_2d, output_2d_path)
+
+# 转 numpy 显示
+f = sitk.GetArrayViewFromImage(fixed_2d)
+m = sitk.GetArrayViewFromImage(moving_2d)
+w = sitk.GetArrayViewFromImage(warped_2d)
+
+plt.figure(figsize=(15,5))
+plt.subplot(1,4,1); plt.imshow(f, cmap='gray'); plt.title(f'Fixed slice {slice_index}'); plt.axis('off')
+plt.subplot(1,4,2); plt.imshow(m, cmap='gray'); plt.title('Moving original'); plt.axis('off')
+plt.subplot(1,4,3); plt.imshow(w, cmap='gray'); plt.title('After 2D registration'); plt.axis('off')
+plt.subplot(1,4,4); plt.imshow(0.6*f + 0.4*w, cmap='gray'); plt.title('Overlay'); plt.axis('off')
+plt.tight_layout()
+plt.show()
+
+print(f"第 {slice_index} 层 2D 配准完成！结果已保存")
+# r = sitk.ImageRegistrationMethod()
+# r.SetMetricAsMattesMutualInformation(numberOfHistogramBins=64)
+# r.SetMetricSamplingStrategy(r.RANDOM)
+# r.SetMetricSamplingPercentage(0.20)
+# r.SetInterpolator(sitk.sitkLinear)
+# r.SetOptimizerAsGradientDescent(learningRate=1.0, 
+#                                 numberOfIterations=300,
+#                                 estimateLearningRate=r.EachIteration)
+# r.SetOptimizerScalesFromPhysicalShift()
+# r.SetInitialTransform(initial_transform, inPlace=False)
+# r.SetShrinkFactorsPerLevel([4,2,1])
+# r.SetSmoothingSigmasPerLevel([2,1,0])
+
+# affine_tx = r.Execute(fixed, moving)
+# # %%
+# # Step2: 接非刚性（BSpline 或 Demons）
+# composite_tx = sitk.CompositeTransform([affine_tx])
+
+# bspline_tx = sitk.BSplineTransformInitializer(fixed, [10,10,10])  # 3级BSpline
+# composite_tx.AddTransform(bspline_tx)
+
+# r.SetInitialTransform(composite_tx, inPlace=True)
+# r.SetMetricAsMeanSquares()                 # 仿射后同模态用 MSE 更快
+# # r.SetNumberOfIterations(500)
+
+# # final_tx = r.Execute(fixed, moving)
+# # %%
+# # 应用
+# resampler = sitk.ResampleImageFilter()
+# resampler.SetReferenceImage(fixed)
+# resampler.SetInterpolator(sitk.sitkLinear)
+# resampler.SetTransform(final_tx)
+# warped = resampler.Execute(moving)
+
+# sitk.WriteImage(warped, 'T2_to_T1_simpleitk.nii.gz')
+# sitk.WriteTransform(final_tx, 'T2_to_T1.tfm')  # 可保存复合变换
+# print("SimpleITK 完成！速度约1-3分钟")
 # %% !! 这里需要注意仿真的 threshold, 可能会影响仿真图
 
 for i in range(phantom.shape[0]):
