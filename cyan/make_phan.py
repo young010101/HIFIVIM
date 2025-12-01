@@ -145,6 +145,8 @@ print(f"第 {slice_index} 层 2D 配准完成！结果已保存")
 # sitk.WriteImage(warped, 'T2_to_T1_simpleitk.nii.gz')
 # sitk.WriteTransform(final_tx, 'T2_to_T1.tfm')  # 可保存复合变换
 # print("SimpleITK 完成！速度约1-3分钟")
+# %%
+phantom = phantom / phantom.max() * 3.0
 # %% !! 这里需要注意仿真的 threshold, 可能会影响仿真图
 
 for i in range(phantom.shape[0]):
@@ -188,7 +190,7 @@ for i in range(phantom.shape[0]):
         phantom_data[i,j] = ivim_model(Fp[i,j], Dt[i,j], Dp[i,j], bvals)
         phantom_data[i,j][Dt[i,j] == 0] =0
 
-# %%
+# %%==============sounds good=======================
 phantom_data.shape
 # %%
 plt.figure()
