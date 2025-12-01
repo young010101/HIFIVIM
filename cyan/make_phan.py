@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 sys.path.append('./code')
 
+from Phantom_utils import make_phantom, add_phase, add_sens_maps, get_fft, \
+    pub_figure, bland_altman_image
 from utils import *
 # %%
 
@@ -158,5 +160,28 @@ for i, ax in enumerate(axes.flat):
     ax.imshow(composite_ivim[..., i * 3].real, cmap='gray')
     ax.set_title('b = {} s/mm$^2$'.format(bvals[i * 3]), fontsize=14, fontweight='bold')
     ax.axis('off')
+
+# %%
+# todo
+composite_ivim_sens,sens_maps = np.repeat(composite_ivim[:, :, np.newaxis, :], 16, axis=2), np.ones(shape=(164,164,16),dtype=np.complex128)# add_sens_maps... 164x164x16x15
+
+fft_ivim = np.expand_dims(get_fft({}, composite_ivim_sens, show=False), axis=2)  # 164x164x1x16x15
+sens_maps = np.expand_dims(sens_maps, axis=2)
+
+sense_prelim = get_initial_sens(fft_ivim, sens_maps)  # 164x164x15
+phase_removal = lowres_phaseremoval(sense_prelim)
+composite_sens, _ = get_composite_sens(sense_prelim, sens_maps, visualize="False")  # 164 x 164 x 16 x 15 x 1
+composite_sens = np.expand_dims(np.transpose(composite_sens, (0, 1, 4, 2, 3)), axis=4)
+# %%
+
+# Load Basis
+basis2 = cfl.readcfl('Standard_Files/ivim_basis_2')
+basis3 = cfl.readcfl('Standard_Files/ivim_basis_3')
+basis4 = cfl.readcfl('Standard_Files/ivim_basis_4')
+basis5 = cfl.readcfl('Standard_Files/ivim_basis_5')
+
+fft_ivim = np.expand_dims(fft_ivim, axis=4)
+recon, recon_fmac2 = llr_recon(fft_ivim, composite_sens, basis2,
+                                use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
 
 # %%
