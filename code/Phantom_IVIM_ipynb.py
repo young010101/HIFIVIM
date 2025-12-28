@@ -1,6 +1,8 @@
 # %%
 import os
 import numpy as np
+import multiprocessing
+import datetime
 from argparse import ArgumentParser
 import cfl
 from Phantom_utils import make_phantom, add_phase, add_sens_maps, get_fft, \
@@ -15,6 +17,7 @@ def parser():
     return parse.parse_args()
 
 
+# %%
 args = parser()
 if os.path.exists(args.outdir):
     pass
