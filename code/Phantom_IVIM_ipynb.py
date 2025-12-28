@@ -1,4 +1,4 @@
-# %%
+# %% run ../../../src/bart/startup.py
 import os
 import numpy as np
 import multiprocessing
