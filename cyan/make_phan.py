@@ -1,0 +1,289 @@
+# %%
+%run ../bart/startup.py
+#%%
+import os
+import nibabel as nib
+import numpy as np
+import sys
+import matplotlib.pyplot as plt
+
+sys.path.append('./code')
+
+from Phantom_utils import make_phantom, add_phase, add_sens_maps, get_fft, \
+    pub_figure, bland_altman_image
+from utils import *
+# %%
+
+slice = 90
+
+
+bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
+phantom = nib.load(os.path.join('./Phantom', 'Phantom_T1.nii.gz')).get_fdata()[..., slice]
+
+Dt, Fp, Dp = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
+phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], 15))
+WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(Dt), np.zeros_like(Dt), \
+                                            np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt)
+
+center = (45,100)
+height, width = phantom.shape
+
+WMH_mask1 = np.zeros_like(Dt)
+y, x = np.ogrid[:height, :width]
+radius = 5
+WMH_mask1[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
+
+WMH_mask2 = np.zeros_like(Dt)
+center, radius = (53,60), 3.5
+WMH_mask2[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
+
+WMH_mask3 = np.zeros_like(Dt)
+center, radius = (60,100), 3
+WMH_mask3[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
+
+
+# %%
+plt.imshow(phantom * (np.ones_like(Dt) - WMH_mask1 - WMH_mask2 - WMH_mask3))
+plt.colorbar()
+
+# %%
+sq_mask=np.zeros_like(Dt)
+sq_mask[62:103,65:101]=1
+plt.imshow(phantom * sq_mask)
+
+# %%
+import SimpleITK as sitk
+output_2d_path = 'T2_slice85_to_T1_slice85.nii.gz'
+slice_index=90
+fixed_3d = sitk.ReadImage('./Phantom/phase_estimates.nii.gz', sitk.sitkFloat32)
+moving_3d = sitk.ReadImage('./Phantom/Phantom_T1.nii.gz', sitk.sitkFloat32)
+fixed_2d = fixed_3d[:,:,0]
+moving_2d = moving_3d[:,:,slice_index]
+fixed=fixed_2d
+moving=moving_2d
+# %%
+print(fixed.GetDimension())
+print(fixed.GetSize())
+print(fixed.GetSpacing())
+print(fixed.GetDirection())
+print(moving.GetDimension())
+print(moving.GetSize())
+print(moving.GetSpacing())
+print(moving.GetDirection())
+#%%
+# sitk.Show(fixed)
+
+#%% Step1: 刚性+仿射（快速对齐）
+transform = sitk.CenteredTransformInitializer(fixed, moving, 
+                                                        sitk.Euler2DTransform(), 
+                                                        sitk.CenteredTransformInitializerFilter.GEOMETRY)
+# %%
+reg = sitk.ImageRegistrationMethod()
+reg.SetMetricAsMattesMutualInformation(50)
+reg.SetOptimizerAsGradientDescent(learningRate=2.0, numberOfIterations=200)
+reg.SetOptimizerScalesFromPhysicalShift()
+reg.SetInitialTransform(transform, inPlace=False)
+reg.SetInterpolator(sitk.sitkLinear)
+
+final_transform = reg.Execute(fixed_2d, moving_2d)
+
+# 5. 重采样
+warped_2d = sitk.Resample(moving_2d, fixed_2d, final_transform,
+                          sitk.sitkLinear, 0.0, moving_2d.GetPixelID())
+
+# 6. 保存 + 可视化
+sitk.WriteImage(warped_2d, output_2d_path)
+
+# 转 numpy 显示
+f = sitk.GetArrayViewFromImage(fixed_2d)
+m = sitk.GetArrayViewFromImage(moving_2d)
+w = sitk.GetArrayViewFromImage(warped_2d)
+
+plt.figure(figsize=(15,5))
+plt.subplot(1,4,1); plt.imshow(f, cmap='gray'); plt.title(f'Fixed slice {slice_index}'); plt.axis('off')
+plt.subplot(1,4,2); plt.imshow(m, cmap='gray'); plt.title('Moving original'); plt.axis('off')
+plt.subplot(1,4,3); plt.imshow(w, cmap='gray'); plt.title('After 2D registration'); plt.axis('off')
+plt.subplot(1,4,4); plt.imshow(0.6*f + 0.4*w, cmap='gray'); plt.title('Overlay'); plt.axis('off')
+plt.tight_layout()
+plt.show()
+
+print(f"第 {slice_index} 层 2D 配准完成！结果已保存")
+# r = sitk.ImageRegistrationMethod()
+# r.SetMetricAsMattesMutualInformation(numberOfHistogramBins=64)
+# r.SetMetricSamplingStrategy(r.RANDOM)
+# r.SetMetricSamplingPercentage(0.20)
+# r.SetInterpolator(sitk.sitkLinear)
+# r.SetOptimizerAsGradientDescent(learningRate=1.0, 
+#                                 numberOfIterations=300,
+#                                 estimateLearningRate=r.EachIteration)
+# r.SetOptimizerScalesFromPhysicalShift()
+# r.SetInitialTransform(initial_transform, inPlace=False)
+# r.SetShrinkFactorsPerLevel([4,2,1])
+# r.SetSmoothingSigmasPerLevel([2,1,0])
+
+# affine_tx = r.Execute(fixed, moving)
+# # %%
+# # Step2: 接非刚性（BSpline 或 Demons）
+# composite_tx = sitk.CompositeTransform([affine_tx])
+
+# bspline_tx = sitk.BSplineTransformInitializer(fixed, [10,10,10])  # 3级BSpline
+# composite_tx.AddTransform(bspline_tx)
+
+# r.SetInitialTransform(composite_tx, inPlace=True)
+# r.SetMetricAsMeanSquares()                 # 仿射后同模态用 MSE 更快
+# # r.SetNumberOfIterations(500)
+
+# # final_tx = r.Execute(fixed, moving)
+# # %%
+# # 应用
+# resampler = sitk.ResampleImageFilter()
+# resampler.SetReferenceImage(fixed)
+# resampler.SetInterpolator(sitk.sitkLinear)
+# resampler.SetTransform(final_tx)
+# warped = resampler.Execute(moving)
+
+# sitk.WriteImage(warped, 'T2_to_T1_simpleitk.nii.gz')
+# sitk.WriteTransform(final_tx, 'T2_to_T1.tfm')  # 可保存复合变换
+# print("SimpleITK 完成！速度约1-3分钟")
+# %%
+phantom = phantom / phantom.max() * 3.0
+# %% !! 这里需要注意仿真的 threshold, 可能会影响仿真图
+
+for i in range(phantom.shape[0]):
+    for j in range(phantom.shape[1]):
+        if WMH_mask1[i,j] == 1:
+            Dt[i, j] = 0.0012
+            Fp[i, j] = 0.16
+            Dp[i, j] = 0.025
+        elif WMH_mask2[i, j] == 1:
+            Dt[i, j] = 0.0014
+            Fp[i, j] = 0.17
+            Dp[i, j] = 0.028
+        elif WMH_mask3[i, j] == 1:
+            Dt[i, j] = 0.0013
+            Fp[i, j] = 0.165
+            Dp[i, j] = 0.027
+        else:
+            if j < 101 and j > 65 and i > 62 and i < 103:
+                Dt[i, j] = 0.0006 if phantom[i, j] > 2.5 else 0.0005 if phantom[i, j] > 1.7 else 0.003 if phantom[
+                                                                                                                i, j] > 0 else 0
+                Fp[i, j] = 0.07 if phantom[i, j] > 2.5 else 0.06 if phantom[i, j] > 1.7 else 0.25 if phantom[
+                                                                                                            i, j] > 0 else 0
+                Dp[i, j] = 0.045 if phantom[i, j] > 2.5 else 0.055 if phantom[i, j] > 1.7 else 0.02 if phantom[ i, j] > 0 else 0
+            else:
+                Dt[i, j] = 0.0006 if phantom[i, j] > 2.35 else 0.0009 if phantom[i, j] > 1.7 else 0.003 if phantom[
+                                                                                                                i, j] > 0 else 0
+                Fp[i, j] = 0.07 if phantom[i, j] > 2.35 else 0.14 if phantom[i, j] > 1.7 else 0.2 if phantom[
+                                                                                                        i, j] > 0 else 0
+                Dp[i, j] = 0.045 if phantom[i, j] > 2.35 else 0.03 if phantom[i, j] > 1.7 else 0.02 if phantom[
+                                                                                                            i, j] > 0 else 0
+        if Dt[i,j] == 0.0006:
+            WMmask[i,j] = 1
+        elif Dt[i, j] == 0.0005:
+            BGmask[i, j] = 1
+        elif Dt[i, j] == 0.0009:
+            GMmask[i, j] = 1
+        elif Dt[i, j] == 0.003:
+            CSFmask[i, j] = 1
+
+
+        phantom_data[i,j] = ivim_model(Fp[i,j], Dt[i,j], Dp[i,j], bvals)
+        phantom_data[i,j][Dt[i,j] == 0] =0
+
+# %%==============sounds good=======================
+phantom_data.shape
+# %%
+plt.figure()
+plt.subplot(231), plt.imshow(np.rot90(WMmask), cmap='gray'), plt.axis('off')
+plt.subplot(232),  plt.imshow(np.rot90(GMmask), cmap='gray'), plt.axis('off')
+plt.subplot(233), plt.imshow(np.rot90(BGmask), cmap='gray'), plt.axis('off')
+plt.subplot(234), plt.imshow(np.rot90(WMH_mask1), cmap='gray'), plt.axis('off')
+plt.subplot(235), plt.imshow(np.rot90(WMH_mask2), cmap='gray'), plt.axis('off')
+plt.subplot(236), plt.imshow(np.rot90(WMH_mask3), cmap='gray'), plt.axis('off')
+
+cmap = 'turbo'
+fig, axes = plt.subplots(1, 4)
+axes[0].imshow(np.rot90(phantom), cmap='gray'), axes[0].set_xticks([]), axes[0].set_yticks([])
+axes[0].set_title('Phantom', fontsize=16, fontweight='bold')
+
+im = axes[1].imshow(np.rot90(Dt), cmap=cmap)
+axes[1].set_xticks([]), axes[1].set_yticks([])
+axes[1].set_title('D', fontsize=16, fontweight='bold'), im.set_clim(0.0003, 0.0015)
+cax = fig.add_axes([axes[1].get_position().x1 + 0.005,
+                    axes[1].get_position().y0, 0.01, axes[1].get_position().height])
+cbar = plt.colorbar(axes[1].images[0], cax=cax)
+
+
+im = axes[2].imshow(np.rot90(Fp), cmap=cmap)
+axes[2].set_xticks([]), axes[2].set_yticks([])
+axes[2].set_title('f', fontsize=16, fontweight='bold'), im.set_clim(0.04, 0.2)
+cax = fig.add_axes([axes[2].get_position().x1 + 0.005,
+                    axes[2].get_position().y0, 0.01, axes[2].get_position().height])
+cbar = plt.colorbar(axes[2].images[0], cax=cax)
+
+im = axes[3].imshow(np.rot90(Dp), cmap=cmap)
+axes[3].set_xticks([]), axes[3].set_yticks([])
+axes[3].set_title('D*', fontsize=16, fontweight='bold'), im.set_clim(0.01, 0.06)
+cax = fig.add_axes([axes[3].get_position().x1 + 0.005,
+                    axes[3].get_position().y0, 0.01, axes[3].get_position().height])
+cbar = plt.colorbar(axes[3].images[0], cax=cax)
+
+plt.subplots_adjust(wspace=0.5)
+
+plt.figure()
+for i in range(5):
+    plt.subplot(1,5,i+1)
+    plt.imshow(np.rot90(phantom_data[...,(i+3)*2]), cmap='gray'), plt.clim(0.2,1), plt.axis('off')
+    plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
+
+plt.show()
+# %%
+Dt,Fp,Dp, ivim, masks= Dt, Fp, Dp, phantom_data, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
+                                      np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
+# %%
+def plot_demo(img):
+    _, axes = plt.subplots(nrows=1, ncols=5, figsize=(15, 3))
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(img[..., i * 3].real, cmap='gray')
+        ax.set_title('b = {} s/mm$^2$'.format(bvals[i * 3]), fontsize=14, fontweight='bold')
+        ax.axis('off')
+plot_demo(ivim)
+# %%
+plt.imshow(phantom)
+
+composite_ivim = ivim.astype(np.complex64)
+# %%
+composite_ivim = add_noise(composite_ivim, 20, return_img=False)
+# %%
+print(composite_ivim.shape)
+# %%
+_, axes = plt.subplots(nrows=1, ncols=5, figsize=(15, 3))
+for i, ax in enumerate(axes.flat):
+    ax.imshow(composite_ivim[..., i * 3].real, cmap='gray')
+    ax.set_title('b = {} s/mm$^2$'.format(bvals[i * 3]), fontsize=14, fontweight='bold')
+    ax.axis('off')
+
+# %%
+# todo
+composite_ivim_sens,sens_maps = np.repeat(composite_ivim[:, :, np.newaxis, :], 16, axis=2), np.ones(shape=(164,164,16),dtype=np.complex128)# add_sens_maps... 164x164x16x15
+
+fft_ivim = np.expand_dims(get_fft({}, composite_ivim_sens, show=False), axis=2)  # 164x164x1x16x15
+sens_maps = np.expand_dims(sens_maps, axis=2)
+
+sense_prelim = get_initial_sens(fft_ivim, sens_maps)  # 164x164x15
+phase_removal = lowres_phaseremoval(sense_prelim)
+composite_sens, _ = get_composite_sens(sense_prelim, sens_maps, visualize="False")  # 164 x 164 x 16 x 15 x 1
+composite_sens = np.expand_dims(np.transpose(composite_sens, (0, 1, 4, 2, 3)), axis=4)
+# %%
+
+# Load Basis
+basis2 = cfl.readcfl('Standard_Files/ivim_basis_2')
+basis3 = cfl.readcfl('Standard_Files/ivim_basis_3')
+basis4 = cfl.readcfl('Standard_Files/ivim_basis_4')
+basis5 = cfl.readcfl('Standard_Files/ivim_basis_5')
+
+fft_ivim = np.expand_dims(fft_ivim, axis=4)
+recon, recon_fmac2 = llr_recon(fft_ivim, composite_sens, basis2,
+                                use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
+
+# %%

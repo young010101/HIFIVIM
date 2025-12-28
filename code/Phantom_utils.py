@@ -434,8 +434,16 @@ def calc_bland_altman_brain_phantom(map_ref, map_calc, axis, masks, name, loc, f
             np.round(med_error_tmp,decimals=4), np.round(med_bias_tmp,decimals=4),
             np.round(rCV_tmp, decimals=4)
         ))
-        map_calc2.append(map_calc[mask==1].mean())
-        map_ref2.append(map_ref[mask==1].mean())
+        # Only calculate mean if there are valid pixels in the mask
+        mask_pixels = map_calc[mask==1]
+        ref_pixels = map_ref[mask==1]
+        if len(mask_pixels) > 0:
+            map_calc2.append(mask_pixels.mean())
+            map_ref2.append(ref_pixels.mean())
+        else:
+            # Skip this mask as it contains no valid data
+            print(f"Warning: Mask contains no valid pixels, skipping...")
+            continue
 
     map_calc2, map_ref2 = np.asarray(map_calc2), np.asarray(map_ref2)
     diff = (map_calc2 - map_ref2)
@@ -455,5 +463,12 @@ def calc_bland_altman_brain_phantom(map_ref, map_calc, axis, masks, name, loc, f
             text.set_fontweight('bold')
         axis.set_xlabel("Average {}".format(name), fontsize=fontsize, fontweight='bold')
         axis.set_ylabel("Difference in {}".format(name), fontsize=fontsize, fontweight='bold')
-        axis.set_xlim(mean.min() - 0.125 * mean.min(), mean.max() + 0.125 * mean.max())
+        # Handle NaN values in mean array to avoid axis limit errors
+        if len(mean[~np.isnan(mean)]) > 0:
+            mean_finite = mean[~np.isnan(mean)]
+            axis.set_xlim(mean_finite.min() - 0.125 * abs(mean_finite.min()),
+                         mean_finite.max() + 0.125 * abs(mean_finite.max()))
+        else:
+            # If all values are NaN, set default limits
+            axis.set_xlim(-1, 1)
     return None
