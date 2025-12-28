@@ -11,23 +11,29 @@ from utils import add_noise, get_initial_sens, lowres_phaseremoval, \
     get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu
 
 
-def parser():
+def parser(argv=None):
     parse = ArgumentParser()
     parse.add_argument('--phantom_dir', type=str, default='phantom_1.0mm_normal_fuzzy')
     parse.add_argument('--outdir', type=str)
-    return parse.parse_args()
+    return parse.parse_args(argv)
 
 
 # %%
-args = parser()
+args = parser(["--outdir", "../Phantom"])
+# args.__dict__
+# args = SimpleNamespace(phantom_dir='phantom_1.0mm_normal_fuzzy', outdir='/tmp/out')
+# %%
 if os.path.exists(args.outdir):
     pass
 else:
     os.mkdir(args.outdir)
+    print(f"Created directory {args.outdir}")
 
 bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
 
-Dt, Fp, Dp, ivim, masks = make_phantom(args, show=False)  # 164 x 164 x 15 for ivim
+# %%
+Dt, Fp, Dp, ivim, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+# %%
 tmp_list = [Dt, Fp, Dp]
 WMmask, GMmask, CSFmask, BGmask, WMH_mask1, WMH_mask2, WMH_mask3 = masks
 masks = [WMmask, GMmask, BGmask, WMH_mask1, WMH_mask2, WMH_mask3]
