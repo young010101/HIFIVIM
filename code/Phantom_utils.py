@@ -63,11 +63,13 @@ def get_phantom(args):
 
 
 def make_phantom(args, show=True):
-    slice = 24
+    slice = 90
 
 
     bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
     phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz')).get_fdata()[..., slice]
+    phantom[phantom < 200] = 0
+    phantom = phantom / phantom.max() * 4.  # scale to 0-3.
 
     Dt, Fp, Dp = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
     phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], 15))
@@ -145,9 +147,10 @@ def make_phantom(args, show=True):
         plt.subplot(236), plt.imshow(np.rot90(WMH_mask3), cmap='gray'), plt.axis('off')
 
         cmap = 'turbo'
-        fig, axes = plt.subplots(1, 4)
+        fig, axes = plt.subplots(1, 4, figsize=(16,4))
         axes[0].imshow(np.rot90(phantom), cmap='gray'), axes[0].set_xticks([]), axes[0].set_yticks([])
         axes[0].set_title('Phantom', fontsize=16, fontweight='bold')
+        plt.colorbar(axes[0].images[0], ax=axes[0], fraction=0.046, pad=0.04)
 
         im = axes[1].imshow(np.rot90(Dt), cmap=cmap)
         axes[1].set_xticks([]), axes[1].set_yticks([])
@@ -173,7 +176,8 @@ def make_phantom(args, show=True):
 
         plt.subplots_adjust(wspace=0.5)
 
-        plt.figure()
+        # ####################################################
+        plt.figure(figsize=(15,3))
         for i in range(5):
             plt.subplot(1,5,i+1)
             plt.imshow(np.rot90(phantom_data[...,(i+3)*2]), cmap='gray'), plt.clim(0.2,1), plt.axis('off')
@@ -188,7 +192,7 @@ def make_phantom(args, show=True):
 def add_phase(args, ivim, bvals = None, show=True, dki=False):
     shift_amount = int(-np.ceil(164 / (2 * 2)))
     bvals15 = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
-    phase_estimates = np.roll(nib.load('Phantom/phase_estimates.nii.gz').get_fdata(dtype=np.complex128),
+    phase_estimates = np.roll(nib.load('../Phantom/phase_estimates.nii.gz').get_fdata(dtype=np.complex128),
                                   shift_amount, axis=1)
     if bvals is None:
         bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
@@ -206,6 +210,7 @@ def add_phase(args, ivim, bvals = None, show=True, dki=False):
         length = 13 if dki else 15
         fig1, axes1 = plt.subplots(4, length, figsize=(30, 10))  # composite phase
         fig2, axes2 = plt.subplots(2, length, figsize=(25, 10))
+        # len(bvals)
         for i in range(phase_estimates.shape[-1]):
             im = axes1[0, i].imshow(np.rot90(np.abs(composite_ivim[..., i]).squeeze()), cmap='gray')
             im.set_clim(0.2, 1)
@@ -256,10 +261,10 @@ def add_sens_maps(args, composite_ivim, bvals=None, show=True, dki=False):
 
     indices = [i for i, item in enumerate(bvals15) if item in (bvals)]
 
-    phase_estimates = np.roll(nib.load('Phantom/phase_estimates.nii.gz').get_fdata(dtype=np.complex128),
+    phase_estimates = np.roll(nib.load('../Phantom/phase_estimates.nii.gz').get_fdata(dtype=np.complex128),
                                   shift_amount,
                                   axis=1)
-    sens_maps = np.roll(nib.load('Phantom/sens_maps.nii.gz').get_fdata(dtype=np.complex128), shift_amount,
+    sens_maps = np.roll(nib.load('../Phantom/sens_maps.nii.gz').get_fdata(dtype=np.complex128), shift_amount,
                             axis=1).squeeze()
 
     phase_estimates = phase_estimates[...,indices]
