@@ -251,6 +251,7 @@ def llr_recon(data, sens, basis, R=2, lambda1=0.005, lambda2=0.001, use_basis=Fa
         if R==3:
             recon = bart(1, 'pics -d 5 -i 100 -S -c -R L:3:3:0.00005 -R W:3:0:0.00001', data_stacked, multisens_stacked)
         else:
+            print(f"data_stacked.shape: {data_stacked.shape}, multisens_stacked.shape: {multisens_stacked.shape}")
             recon = bart(1, 'pics -i 100 -d 5 -e -S -R L:3:3:{} -R W:3:0:{}'.format(lambda1, lambda2), data_stacked, multisens_stacked)
 
         recon = bart(1, 'transpose 4 6', recon)
