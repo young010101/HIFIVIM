@@ -123,25 +123,25 @@ for i in range(num_bvals):
 show_15_bvals(sens_prelim_fix2)
 show_15_bvals(composite_ivim)
 
-# %%
-sens_prelim_fix3 = np.zeros_like(sens_prelim_fix)
-for i in range(num_bvals):
-    sens_prelim_fix3[..., i] = bart(1, 'pics -e -d 5 -i 100 -S -R L:3:3:0.001 -R W:3:0:0.001', fft_ivim[...,i], sens_maps_expand)
-# %%
-show_15_bvals(sens_prelim_fix3)
-# %%
+# # %%
+# sens_prelim_fix3 = np.zeros_like(sens_prelim_fix)
+# for i in range(num_bvals):
+#     sens_prelim_fix3[..., i] = bart(1, 'pics -e -d 5 -i 100 -S -R L:3:3:0.001 -R W:3:0:0.001', fft_ivim[...,i], sens_maps_expand)
+# # %%
+# show_15_bvals(sens_prelim_fix3)
+# # %%
 show = True
-if show:
-    import matplotlib.pyplot as plt
+# if show:
+#     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(3, 5, figsize=(15, 9))
-    axes_flat = axes.ravel()
-    for i, ax in enumerate(axes_flat):
-        ax.imshow(np.abs(sens_prelim_fix2[:, :, i]), cmap='gray')
-        ax.set_title(f'Prelim Sens Map Magnitude - Bval {bvals[i]}')
-        ax.axis('off')
-    plt.tight_layout()
-    plt.show()
+#     fig, axes = plt.subplots(3, 5, figsize=(15, 9))
+#     axes_flat = axes.ravel()
+#     for i, ax in enumerate(axes_flat):
+#         ax.imshow(np.abs(sens_prelim_fix2[:, :, i]), cmap='gray')
+#         ax.set_title(f'Prelim Sens Map Magnitude - Bval {bvals[i]}')
+#         ax.axis('off')
+#     plt.tight_layout()
+#     plt.show()
 
 # %%
 sense_prelim = sens_prelim_fix2
@@ -187,16 +187,27 @@ plot_basis(axes[1, 1], title="IVIM Basis 5", basis=basis5)
 
 # %%
 print(fft_ivim.shape)
+# %%
 # recon_fmac2.shape
+# 0      1      2      3      4      5      6      7      8      9    10   11   12   13   14
+# RO     PH1    PH2    CHA    MAPS   TE     COEFF  COEFF2 ITER
+# 164    164    1      16     1      15
 fft_ivim = np.expand_dims(fft_ivim, axis=4)
 print(fft_ivim.shape)
+# %%
+def print_info(x, name="Variable"):
+    print(f"{name} shape: {x.shape}, dtype: {x.dtype}")
+print_info(fft_ivim, "fft_ivim")
+print_info(composite_sens, "composite_sens")
+print_info(basis2, "basis2")
+
 # %%
 recon, recon_fmac2 = llr_recon(fft_ivim, composite_sens, basis2,
                                 use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
 # %%
-print(recon.shape)
-print(recon_fmac2.shape)
-print(recon_fmac2.squeeze().shape)
+print_info(recon, "recon")
+print_info(recon_fmac2, "recon_fmac2")
+print_info(recon_fmac2.squeeze(), "recon_fmac2.squeeze()")
 plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
 # %%
