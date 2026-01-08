@@ -311,6 +311,7 @@ sub4 = [Dtsub4, Fpsub5, Dpsub4]
 sub5 = [Dtsub5, Fpsub5, Dpsub5]
 lowres = [Dtlowres, Fplowres, Dplowres]
 
+# %%
 pub_figure(sub2, sub3, sub4, sub5, lowres, mags, GTs)
 bland_altman_image(sub2, sub3, sub4, sub5, mags, GTs, masks)
 
