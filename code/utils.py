@@ -42,6 +42,73 @@ def ivim_model(f: float, D: float, Dstar: float, bvals):
     return tmp
 
 
+def dtd_gamma_model(
+    s0,
+    d_iso,
+    mu2_iso,
+    mu2_aniso,
+    bvals,
+    b_delta=None,
+    b_eta=None,
+    rs=None,
+    s_ind=None,
+):
+    """
+    Python equivalent of dtd_gamma_1d_fit2data
+
+    Parameters
+    ----------
+    bvals : array
+        b-values (s/mm^2)
+    s0 : float
+        Baseline signal
+    d_iso : float
+        Mean diffusivity (MD)
+    mu2_iso : float
+        Isotropic variance
+    mu2_aniso : float
+        Anisotropic variance
+    b_delta : array or None
+        b-tensor anisotropy
+    b_eta : array or None
+        Asymmetry parameter
+    rs : array or None
+        Relative signal scaling across series
+    s_ind : array or None
+        Series index
+
+    Returns
+    -------
+    s : array
+        Signal S(b)
+    """
+
+    bvals = np.asarray(bvals)
+
+    # ---- baseline weighting (series-dependent S0) ----
+    if rs is not None and s_ind is not None:
+        rs = np.asarray([1.0] + list(rs))
+        sw = s0 * np.sum(
+            (rs[None, :] * (s_ind[:, None] == np.arange(1, len(rs) + 1))),
+            axis=1,
+        )
+    else:
+        sw = s0
+
+    # ---- total diffusional variance ----
+    if b_delta is None:
+        mu2 = mu2_iso
+    else:
+        if b_eta is None:
+            b_eta = 0
+        mu2 = mu2_iso + mu2_aniso * b_delta**2 * (b_eta**2 + 3) / 3
+
+    # ---- gamma model signal ----
+    s = sw * (1 + bvals * mu2 / d_iso) ** (-d_iso**2 / mu2)
+
+    return np.real(s)
+
+
 def phase_estimate_(complexdata, r=25):
     ham = np.hamming(complexdata.shape[0])[:, None]
     ham2 = np.hamming(complexdata.shape[1])[None,:]
