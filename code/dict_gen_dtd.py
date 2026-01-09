@@ -12,8 +12,31 @@ import matplotlib
 import multiprocessing
 import os
 import cfl
-from utils import ivim_model
-from bart import bart
+try:
+    from bart import bart
+except ModuleNotFoundError:
+    import sys
+    # Try to locate BART's Python bindings via environment hints
+    bart_python_env = os.getenv("PYTHONPATH")
+    bart_toolbox = os.getenv("BART_TOOLBOX_PATH")
+
+    candidates = []
+    if bart_python_env:
+        candidates.append(bart_python_env)
+    if bart_toolbox:
+        candidates.append(os.path.join(bart_toolbox, "python"))
+        candidates.append(os.path.join(bart_toolbox, "python3"))
+
+    for p in candidates:
+        if p and os.path.isdir(p) and p not in sys.path:
+            sys.path.insert(0, p)
+    try:
+        from bart import bart
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "Cannot import 'bart'. Ensure BART Python path is on PYTHONPATH or BART_TOOLBOX_PATH is set. Tried: "
+            + ", ".join([str(x) for x in candidates])
+        ) from e
 
 description="Script to generate IVIM dictionary generation and basis estimation for reconstruction.\n" \
             "15 b-values are 0, 5, 7, 10, 15, 20, 30, 40,50, 60, 100, 200, 400, 700, 1000 "
@@ -40,31 +63,96 @@ def parser():
     return args
 
 
-def get_dicc(f, D, Dstar, bvals, i):
+def dtd_gamma_model(
+    s0,
+    d_iso,
+    mu2_iso,
+    mu2_aniso,
+    bvals,
+    b_delta=None,
+    b_eta=None,
+    rs=None,
+    s_ind=None,
+):
+    """
+    Python equivalent of dtd_gamma_1d_fit2data
+
+    Parameters
+    ----------
+    bvals : array
+        b-values (s/mm^2)
+    s0 : float
+        Baseline signal
+    d_iso : float
+        Mean diffusivity (MD)
+    mu2_iso : float
+        Isotropic variance
+    mu2_aniso : float
+        Anisotropic variance
+    b_delta : array or None
+        b-tensor anisotropy
+    b_eta : array or None
+        Asymmetry parameter
+    rs : array or None
+        Relative signal scaling across series
+    s_ind : array or None
+        Series index
+
+    Returns
+    -------
+    s : array
+        Signal S(b)
+    """
+
+    bvals = np.asarray(bvals)
+
+    # ---- baseline weighting (series-dependent S0) ----
+    if rs is not None and s_ind is not None:
+        rs = np.asarray([1.0] + list(rs))
+        sw = s0 * np.sum(
+            (rs[None, :] * (s_ind[:, None] == np.arange(1, len(rs) + 1))),
+            axis=1,
+        )
+    else:
+        sw = s0
+
+    # ---- total diffusional variance ----
+    if b_delta is None:
+        mu2 = mu2_iso
+    else:
+        if b_eta is None:
+            b_eta = 0
+        mu2 = mu2_iso + mu2_aniso * b_delta**2 * (b_eta**2 + 3) / 3
+
+    # ---- gamma model signal ----
+    s = sw * (1 + bvals * mu2 / d_iso) ** (-d_iso**2 / mu2)
+
+    return np.real(s)
 
 
-    signal = ivim_model(f, D, Dstar, bvals)
-    return i, signal, (f, D, Dstar)
+def get_dicc(s0, d_iso, mu2_iso, mu2_aniso, bvals, i):
 
+
+    signal = dtd_gamma_model(s0, d_iso, mu2_iso, mu2_aniso, bvals)
+    return i, signal, (s0, d_iso, mu2_iso, mu2_aniso)
 def main():
 
     args = parser()
-    # bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
-    from dipy.data import get_fnames
-    from dipy.io.gradients import read_bvals_bvecs
-    fraw, fbval,fbvec = get_fnames(name='ivim')
-    bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
+    bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
 
     size = 90
-    fs = np.linspace(0, 0.4, size)  # 0, 0.4
-    Ds = np.linspace(0.3e-3, 3e-3, size)  # try it
-    Dstars = np.linspace(5e-3, 60e-3, size)
-    size = int(size * size * size)
+    s0 = 10
+    d_iso = np.linspace(0.001, 4, size)  # 0, 0.4
+    mu2_iso = np.linspace(1e-6, 5, size)  # try it
+    mu2_aniso = np.linspace(1e-6, 5, size)
+    size = int(size * size * size * size)
     ivim_dicc = np.zeros((size, len(bvals)))
 
     ## Code to generate the dictionary
     print("Now generating dictionary...")
-    args2 = [(f, D, Dstar, bvals, i) for i, (f, D, Dstar) in enumerate(itertools.product(fs, Ds, Dstars))]
+    args2 = [(s0, D, Dstar, mu2a, bvals, i) for i, (D, Dstar, mu2a) in enumerate(itertools.product(d_iso, mu2_iso, mu2_aniso))]
+    start_time = datetime.datetime.now()
+    print("Start time: ", start_time)
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
         results = pool.starmap(get_dicc, args2)
         pool.close()
@@ -72,6 +160,8 @@ def main():
         results = np.asarray(results, dtype=object)
         for i in range(results.shape[0]):
             ivim_dicc[i] = results[i, 1]
+    end_time = datetime.datetime.now()
+    print("End time: ", end_time)
 
     ### Code to Extract Basis Set #####
     if args.make_basis:
@@ -107,6 +197,7 @@ def main():
 
     print("Basis set generation complete. Use ivim_basis_{} for LLR + Subspace reconstruction".format(
         args.basis_size))
+    print(f"ended in {datetime.datetime.now() - start_time}")
 
     return None
 
