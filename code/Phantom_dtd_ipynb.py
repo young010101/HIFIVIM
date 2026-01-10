@@ -830,13 +830,13 @@ def pub_figure(basis2:list, basis3:list, basis4:list,  basis5:list, lowres:list,
     cmap='inferno'
 
     for row in range(axes.shape[0]):
-        # clim = (0.0003, 0.0015) if row == 0 else (0.04, 0.25) if row == 1 else (0.02, 0.06) if row == 2 else (0, 1.5)
+        clim_ = [(0.0003, 0.003), (0.0, 2.5), (0.0, 0.99), (0, 1.5)]
         for col in range(axes.shape[1]):
             images = GTs if col == 0 else basis2 if col == 1 else basis3 if col == 2 else \
                 basis4 if col == 3 else basis5 if col == 4 else lowres if col == 5 else mags
             im = axes[row, col].imshow(images[row],
                                        cmap=cmap)
-            # im.set_clim(clim)
+            # im.set_clim(clim_[row])
 
             if col != 0:
                 nrmse, ssim = calc_rmse(images[row], GTs[row], nrsme=True)
