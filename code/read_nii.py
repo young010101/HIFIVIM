@@ -38,6 +38,7 @@ if __name__ == "__main__":
 	rows = int(np.ceil(n / cols))
 	fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 4*rows))
 	axes = axes.ravel()
+	cmap='inferno'
 	for ax, (k, v) in zip(axes, dtd_items):
 		if v.ndim == 4:
 			img2d = v[:, :, 0, 0]
@@ -45,7 +46,7 @@ if __name__ == "__main__":
 			img2d = v[:, :, 0]
 		else:
 			img2d = v
-		im = ax.imshow(img2d, cmap="gray")
+		im = ax.imshow(img2d, cmap=cmap)
 		ax.set_title(k)
 		ax.axis("off")
 		fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
