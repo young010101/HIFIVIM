@@ -73,11 +73,11 @@ def get_dicc(f, D, Dstar, bvals, i):
 def main():
 
     args = parser()
-    # bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
-    from dipy.data import get_fnames
-    from dipy.io.gradients import read_bvals_bvecs
-    fraw, fbval,fbvec = get_fnames(name='ivim')
-    bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
+    bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
+    # from dipy.data import get_fnames
+    # from dipy.io.gradients import read_bvals_bvecs
+    # fraw, fbval,fbvec = get_fnames(name='ivim')
+    # bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
 
     size = 90
     fs = np.linspace(0, 0.4, size)  # 0, 0.4
