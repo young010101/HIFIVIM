@@ -295,6 +295,26 @@ composite_ivim = add_noise(composite_ivim, 20, return_img=False)
 composite_ivim_sens, sens_maps = add_sens_maps(args, composite_ivim, show=True)  # add_sens_maps... 164x164x16x15
 sens_maps_expand = np.expand_dims(sens_maps, axis=2)
 # %%
+def get_fft(args, composite_ivim_sens, show=True):
+
+    fft_ivim = bart(1, 'fft -u 3', composite_ivim_sens)
+    fft_ivim[:, ::2] = 0 # undersample R=2
+    if show:
+        fig, axes = plt.subplots(4, 4, figsize=(10, 10))
+        fig2, axes2 = plt.subplots(4, 4, figsize=(10, 10))
+        for row in range(4):
+            for col in range(4):
+                im1 = axes[row, col].imshow(np.rot90(abs(fft_ivim[:,:, row + col, 9])**.2), cmap='gray')
+                axes[row, col].set_xticks([]), axes[row, col].set_yticks([])
+
+                im2 = axes2[row, col].imshow(np.rot90(abs(fft_ivim[:, :, row + col, 12])**.2), cmap='gray')
+                axes2[row, col].set_xticks([]), axes2[row, col].set_yticks([])
+
+                im1.set_clim(0, 5)
+                im2.set_clim(0,5)
+
+        plt.show()
+    return fft_ivim
 fft_ivim = np.expand_dims(get_fft(args, composite_ivim_sens, show=True), axis=2)  # 164x164x1x16x15
 # %% sens_maps.shape
 sens_maps = np.expand_dims(sens_maps, axis=2)
@@ -346,10 +366,18 @@ def show_15_bvals(x):
     print(x.shape)
     fix, axes = plt.subplots(3, 5, figsize=(15, 9))
     axes_flat = axes.ravel()
+    last_im = None
     for i, ax in enumerate(axes_flat):
-        ax.imshow(np.abs(x[:, :, i]), cmap='gray')
+        last_im = ax.imshow(np.abs(x[:, :, i]), cmap='gray')
         ax.set_title(f'Prelim Sens Map Magnitude - Bval {bvals[i]}')
         ax.axis('off')
+    # Add a single shared colorbar for the grid
+    if last_im is not None:
+        cax = fix.add_axes([axes[-1, -1].get_position().x1 + 0.02,
+                           axes[-1, -1].get_position().y0,
+                           0.01,
+                           axes[0, -1].get_position().y1 - axes[-1, -1].get_position().y0])
+        fix.colorbar(last_im, cax=cax)
     plt.tight_layout()
     plt.show()
 show_15_bvals(sens_prelim_fix)
@@ -486,7 +514,7 @@ recon, recon_fmac2 = llr_recon_with_retry(
 # %% save recon fmac2 to mat
 import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
-# %% plot
+# %% todo plot, why signal is larger than 10?
 recon_fmac2_squeezed = np.real(recon_fmac2.squeeze())
 plt.plot(bvals, recon_fmac2_squeezed[82, 82, :], 'o-')
 plt.plot(bvals, recon_fmac2_squeezed[50, 50, :], 'o-')
