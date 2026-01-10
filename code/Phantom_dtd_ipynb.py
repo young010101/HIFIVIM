@@ -528,6 +528,17 @@ def plot_recon_vs_ivim(
     plt.title(f"{recon_label} Reconstructed Signal vs. Ground Truth IVIM Signal")
     plt.legend(legend_entries)
 
+def plot_points_on_image(img, points, colors=None, title="Points on image"):
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.imshow(np.abs(img), cmap='gray')
+    if colors is None:
+        colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
+    for (i, j), c in zip(points, colors):
+        plt.plot(j, i, marker='o', color=c, markersize=6)
+    plt.title(title)
+    plt.axis('off')
+
 # %%
 recon, recon_fmac2 = llr_recon_with_retry(
     fft_ivim,
@@ -544,6 +555,11 @@ sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon
 # %% plot recon vs ivim using helper
 points = [(82, 82), (50, 50), (30, 130), (100, 60)]
 plot_recon_vs_ivim(recon_fmac2, ivim, bvals, points, recon_label="2 basis", ivim_scale=1.0)
+# visualize points on the phantom image (use b0 ivim magnitude)
+plot_points_on_image(ivim[:, :, 6], points, title="Selected points on phantom (b0)")
+plot_points_on_image(recon_fmac2.squeeze()[:, :, 6], points, title="Selected points on recon_fmac2 (b0)")
+# can you plot the points on the phantom image?
+
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
@@ -560,6 +576,8 @@ recon, recon_fmac3 = llr_recon_with_retry(
     lambda1=0.001,
     lambda2=0.001,
 )
+#%%
+plot_recon_vs_ivim(recon_fmac3, ivim, bvals, points, recon_label="3 basis", ivim_scale=1.0)
 # %%
 recon, recon_fmac4 = llr_recon_with_retry(
     fft_ivim,
@@ -580,6 +598,9 @@ recon, recon_fmac5 = llr_recon_with_retry(
     lambda1=0.001,
     lambda2=0.001,
 )
+#%%
+plot_recon_vs_ivim(recon_fmac4, ivim, bvals, points, recon_label="4 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac5, ivim, bvals, points, recon_label="5 basis", ivim_scale=1.0)
 # %%
 show_15_bvals(np.real(recon_fmac3.squeeze()))
 show_15_bvals(np.real(recon_fmac4.squeeze()))
