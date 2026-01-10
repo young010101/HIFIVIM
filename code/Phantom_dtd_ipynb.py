@@ -9,7 +9,7 @@ from Phantom_utils import add_phase, add_sens_maps, get_fft, \
     pub_figure, bland_altman_image
 from utils import add_noise, get_initial_sens, lowres_phaseremoval, \
     get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu
-from utils import dtd_gamma_model as ivim_model
+# from utils import dtd_gamma_model as ivim_model
 
 
 def parser(argv=None):
@@ -35,6 +35,83 @@ bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 100
 
 
 # %% make phantom
+# debugging
+def dtd_gamma_model(
+    s0,
+    d_iso,
+    mu2_iso,
+    mu2_aniso,
+    bvals,
+    b_delta=None,
+    b_eta=None,
+    rs=None,
+    s_ind=None,
+):
+    """
+    Python equivalent of dtd_gamma_1d_fit2data
+
+    Parameters
+    ----------
+    bvals : array
+        b-values (s/mm^2)
+    s0 : float
+        Baseline signal
+    d_iso : float
+        Mean diffusivity (MD)
+    mu2_iso : float
+        Isotropic variance
+    mu2_aniso : float
+        Anisotropic variance
+    b_delta : array or None
+        b-tensor anisotropy
+    b_eta : array or None
+        Asymmetry parameter
+    rs : array or None
+        Relative signal scaling across series
+    s_ind : array or None
+        Series index
+
+    Returns
+    -------
+    s : array
+        Signal S(b)
+    """
+
+    bvals = np.asarray(bvals) * 1e-3  # convert to s/um^2
+
+    # ---- baseline weighting (series-dependent S0) ----
+    if rs is not None and s_ind is not None:
+        rs = np.asarray([1.0] + list(rs))
+        sw = s0 * np.sum(
+            (rs[None, :] * (s_ind[:, None] == np.arange(1, len(rs) + 1))),
+            axis=1,
+        )
+    else:
+        sw = s0
+
+    # ---- total diffusional variance ----
+    if b_delta is None:
+        mu2 = mu2_iso
+    else:
+        if b_eta is None:
+            b_eta = 0
+        mu2 = mu2_iso + mu2_aniso * b_delta**2 * (b_eta**2 + 3) / 3
+
+    # ---- gamma model signal ----
+    s = sw * (1 + bvals * mu2 / d_iso) ** (-d_iso**2 / mu2)
+    
+    if np.isnan(s).any():
+        print("NaN encountered in dtd_gamma_model with parameters:")
+        print(f"s0={s0}, d_iso={d_iso}, mu2_iso={mu2_iso}, mu2_aniso={mu2_aniso}")
+        print(f"bvals={bvals}")
+        raise ValueError("NaN encountered in dtd_gamma_model output.")
+
+    return np.real(s)
+
+
+ivim_model = dtd_gamma_model
+
+
 def make_phantom(args, show=True):
     import nibabel as nib
     import matplotlib.pyplot as plt
