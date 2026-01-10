@@ -5,6 +5,7 @@ import multiprocessing
 import datetime
 from argparse import ArgumentParser
 import cfl
+from bart import bart
 from Phantom_utils import add_phase, add_sens_maps, get_fft, \
     pub_figure, bland_altman_image
 from utils import add_noise, get_initial_sens, lowres_phaseremoval, \
@@ -422,6 +423,9 @@ print_info(basis2, "basis2")
 # %%
 recon, recon_fmac2 = llr_recon(fft_ivim, composite_sens, basis2,
                                 use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
+# %% save recon fmac2 to mat
+import scipy.io as sio
+sio.savemat(os.path.join(args.outdir, 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
@@ -530,6 +534,47 @@ sub5 = [Dtsub5, Fpsub5, Dpsub5]
 lowres = [Dtlowres, Fplowres, Dplowres]
 
 # %%
+
+def pub_figure(basis2:list, basis3:list, basis4:list,  basis5:list, lowres:list, mags:list, GTs:list, dki=False):
+    from Phantom_utils import calc_rmse
+
+    fig, axes = plt.subplots(3, 7, figsize=(10, 10))
+    labels = ['D', 'f', 'D*']
+    titles=['Ground-Truth', '2 Bases', '3 Bases', '4 Bases', '5 Bases', 'Phase Removal', 'Conventional']
+    cmap='inferno'
+
+    for row in range(axes.shape[0]):
+        # clim = (0.0003, 0.0015) if row == 0 else (0.04, 0.25) if row == 1 else (0.02, 0.06) if row == 2 else (0, 1.5)
+        for col in range(axes.shape[1]):
+            images = GTs if col == 0 else basis2 if col == 1 else basis3 if col == 2 else \
+                basis4 if col == 3 else basis5 if col == 4 else lowres if col == 5 else mags
+            im = axes[row, col].imshow(images[row],
+                                       cmap=cmap)
+            # im.set_clim(clim)
+
+            if col != 0:
+                nrmse, ssim = calc_rmse(images[row], GTs[row], nrsme=True)
+
+                text_to_add = "NRMSE: {}%\nSSIM: {}".format(nrmse, ssim)
+                axes[row, col].text(82, 25, text_to_add, color='white', fontweight='bold', ha='center')
+            if row == 0:
+                axes[row, col].set_title("{}".format(titles[col]),
+                                         fontweight='bold')
+            if col == 0:
+                axes[row,col].set_ylabel(labels[row], fontweight='bold')
+
+            axes[row,col].set_xticks([]), axes[row,col].set_yticks([])
+
+            if col == 6:
+                cbar_axes = fig.add_axes([axes[row, col].get_position().x1 + 0.02, axes[row, col].get_position().y0,
+                                          0.01, axes[row,col].get_position().y1 - axes[row, col].get_position().y0])
+
+                cbar = plt.colorbar(im, cax=cbar_axes)
+
+    plt.subplots_adjust(wspace=0, hspace=0)
+
+    return None
+
 pub_figure(sub2, sub3, sub4, sub5, lowres, mags, GTs)
 bland_altman_image(sub2, sub3, sub4, sub5, mags, GTs, masks)
 
