@@ -170,7 +170,7 @@ if True:
     plt.figure(figsize=(15,3))
     for i in range(5):
         plt.subplot(1,5,i+1)
-        plt.imshow(np.rot90(ivim[...,(i+3)*2]), cmap='gray'), plt.clim(0.2,1), plt.axis('off')
+        plt.imshow(np.rot90(ivim[...,(i+3)*2]), cmap='gray'), plt.clim(), plt.axis('off')
         plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
         plt.colorbar()
 
