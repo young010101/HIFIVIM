@@ -127,6 +127,7 @@ def make_phantom(args, show=True):
 
     Dt, Fp, Dp = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
     phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], bvals.shape[0]))
+    phantom_data_b_delta_1 = np.zeros_like(phantom_data)
     WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(Dt), np.zeros_like(Dt), \
                                               np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt)
 
@@ -187,6 +188,8 @@ def make_phantom(args, show=True):
 
             phantom_data[i,j] = ivim_model(10, Fp[i,j], Dt[i,j], Dp[i,j], bvals)
             phantom_data[i,j][Dt[i,j] == 0] =0
+            phantom_data_b_delta_1[i,j] = ivim_model(10, Fp[i,j], Dt[i,j], Dp[i,j], bvals, b_delta=np.ones_like(bvals))
+            phantom_data_b_delta_1[i,j][Dt[i,j] == 0] =0
 
 
     if show:
@@ -234,14 +237,15 @@ def make_phantom(args, show=True):
             plt.subplot(1,5,i+1)
             plt.imshow(np.rot90(phantom_data[...,(i+3)*2]), cmap='gray'), plt.clim(), plt.axis('off')
             plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
+            plt.colorbar()
 
         plt.show()
 
-    return Dt, Fp, Dp, phantom_data, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
+    return Dt, Fp, Dp, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
                                       np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
 
 
-Dt, Fp, Dp, ivim, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+Dt, Fp, Dp, ivim, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
 ivim = ivim
 # %%
 print(ivim.shape)
@@ -425,7 +429,18 @@ recon, recon_fmac2 = llr_recon(fft_ivim, composite_sens, basis2,
                                 use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
 # %% save recon fmac2 to mat
 import scipy.io as sio
-sio.savemat(os.path.join(args.outdir, 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
+sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
+# %% plot
+recon_fmac2_squeezed = np.real(recon_fmac2.squeeze())
+plt.plot(bvals, recon_fmac2_squeezed[82, 82, :], 'o-')
+plt.plot(bvals, recon_fmac2_squeezed[50, 50, :], 'o-')
+# plot use ivim and dtd model
+plt.plot(bvals, ivim[82, 82, :] * 170, 'x--')
+plt.plot(bvals, ivim[50, 50, :] * 170, 'x--')
+plt.xlabel('b-values (s/mm$^2$)')
+plt.ylabel('Signal Intensity')
+plt.title('FMac2 Reconstructed Signal vs. Ground Truth IVIM Signal')
+plt.legend(['FMac2 (82,82)', 'FMac2 (50,50)', 'IVIM (82,82)', 'IVIM (50,50)'])
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
