@@ -658,6 +658,63 @@ recon_b_delta_1, recon_fmac3_b_delta_1 = llr_recon_with_retry(
     lambda1=0.001,
     lambda2=0.001,
 )
+# %%
+recon_b_delta_1, recon_fmac4_b_delta_1 = llr_recon_with_retry(
+    fft_ivim_b_delta_1_expand,
+    composite_sens_b_delta_1,
+    bases_dtd_bdelta1[4],
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
+recon_b_delta_1, recon_fmac5_b_delta_1 = llr_recon_with_retry(
+    fft_ivim_b_delta_1_expand,
+    composite_sens_b_delta_1,
+    bases_dtd_bdelta1[5],
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
+# %%
+sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_all.mat'), {
+    'recon': recon,   
+    'recon_fmac2': recon_fmac2,
+    'recon_fmac3': recon_fmac3,
+    'recon_fmac4': recon_fmac4,
+    'recon_fmac5': recon_fmac5,
+    'recon_b_delta_1': recon_b_delta_1,
+    'recon_fmac2_b_delta_1': recon_fmac2_b_delta_1,
+    'recon_fmac3_b_delta_1': recon_fmac3_b_delta_1,
+    'recon_fmac4_b_delta_1': recon_fmac4_b_delta_1,
+    'recon_fmac5_b_delta_1': recon_fmac5_b_delta_1,
+}) 
+ 
+# Save key recon results as NIfTI (.nii.gz)
+def save_nifti(volume, out_path, dtype=np.float32, affine=None):
+    import nibabel as nib
+    vol = np.asarray(volume, dtype=dtype)
+    if vol.ndim == 2:
+        vol = vol[..., np.newaxis]
+    if affine is None:
+        affine = np.eye(4)
+    img = nib.Nifti1Image(vol, affine)
+    nib.save(img, out_path)
+
+outdir_nifti = os.path.join(args.outdir, 'phan_cyan')
+try:
+    save_nifti(np.real(recon_fmac2.squeeze()), os.path.join(outdir_nifti, 'recon_fmac2.nii.gz'))
+    save_nifti(np.real(recon_fmac3.squeeze()), os.path.join(outdir_nifti, 'recon_fmac3.nii.gz'))
+    save_nifti(np.real(recon_fmac4.squeeze()), os.path.join(outdir_nifti, 'recon_fmac4.nii.gz'))
+    save_nifti(np.real(recon_fmac5.squeeze()), os.path.join(outdir_nifti, 'recon_fmac5.nii.gz'))
+
+    save_nifti(np.real(recon_fmac2_b_delta_1.squeeze()), os.path.join(outdir_nifti, 'recon_fmac2_b_delta_1.nii.gz'))
+    save_nifti(np.real(recon_fmac3_b_delta_1.squeeze()), os.path.join(outdir_nifti, 'recon_fmac3_b_delta_1.nii.gz'))
+    save_nifti(np.real(recon_fmac4_b_delta_1.squeeze()), os.path.join(outdir_nifti, 'recon_fmac4_b_delta_1.nii.gz'))
+    save_nifti(np.real(recon_fmac5_b_delta_1.squeeze()), os.path.join(outdir_nifti, 'recon_fmac5_b_delta_1.nii.gz'))
+except Exception as e:
+    print(f"Failed to save NIfTI files: {e}")
 #%%
 plot_recon_vs_ivim(recon_fmac4, ivim, bvals, points, recon_label="4 basis", ivim_scale=1.0)
 plot_recon_vs_ivim(recon_fmac5, ivim, bvals, points, recon_label="5 basis", ivim_scale=1.0)
@@ -670,6 +727,9 @@ plot_recon_vs_ivim(recon_fmac2_b_delta_1, ivim, bvals, points, recon_label="2 ba
 plot_recon_vs_ivim(recon_fmac3_b_delta_1, ivim, bvals, points, recon_label="3 basis b_delta_1", ivim_scale=1.0)
 show_15_bvals(np.real(recon_fmac2_b_delta_1.squeeze()))
 show_15_bvals(np.real(recon_fmac3_b_delta_1.squeeze()))
+# %%
+plot_recon_vs_ivim(recon_fmac4_b_delta_1, ivim, bvals, points, recon_label="4 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac5_b_delta_1, ivim, bvals, points, recon_label="5 basis b_delta_1", ivim_scale=1.0)
 # %%
 recon_fmac2 = np.real(recon_fmac2.squeeze())
 # %%
