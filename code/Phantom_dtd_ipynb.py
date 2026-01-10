@@ -392,8 +392,8 @@ print(basis4.shape)
 print(basis5.shape)
 # %%
 fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-def plot_basis(ax, title="", basis=None):
-    ax.plot(basis.squeeze()[:, :], label=title)
+def plot_basis(ax, title="", basis=None, bvals=bvals):
+    ax.plot(bvals, basis.squeeze()[:, :], label=title)
     ax.set_title(title)
     ax.set_xlabel('b-values')
     ax.set_ylabel('Signal Intensity')
