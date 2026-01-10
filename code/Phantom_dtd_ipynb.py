@@ -6,6 +6,7 @@ import multiprocessing
 import datetime
 from argparse import ArgumentParser
 import cfl
+import nibabel as nib    
 from bart import bart
 from Phantom_utils import add_phase, add_sens_maps, get_fft, \
     pub_figure, bland_altman_image
@@ -863,4 +864,30 @@ def pub_figure(basis2:list, basis3:list, basis4:list,  basis5:list, lowres:list,
 pub_figure(sub2, sub3, sub4, sub5, lowres, mags, GTs)
 bland_altman_image(sub2, sub3, sub4, sub5, mags, GTs, masks)
 
+# %%
+
+
+def load_dtd_gamma(directory, names=("dtd_gamma_Vi", "dtd_gamma_Va", "dtd_gamma_MD")):
+	"""Load selected dtd_gamma_* nifti files into a dict."""
+	data = {}
+	for name in names:
+		candidates = [f"{name}.nii", f"{name}.nii.gz"]
+		for fname in candidates:
+			path = os.path.join(directory, fname)
+			if os.path.exists(path):
+				img = nib.load(path)
+				data[name] = img.get_fdata()
+				break
+	return data
+
+
+directory = '/data/users/cyang/repos/HIFIVIM/Phantom/phan_cyan/processed/brain'
+data_sel = load_dtd_gamma(directory)
+print("selected dtd_gamma loaded:")
+for k, v in data_sel.items():
+    print(f"{k}: shape={v.shape}, dtype={v.dtype}")
+
+sub2_dt_gamma = [data_sel['dtd_gamma_MD'], data_sel['dtd_gamma_Vi'], data_sel['dtd_gamma_Va']]
+
+pub_figure(sub2_dt_gamma, GTs, GTs, GTs, GTs, GTs, GTs)
 # %%
