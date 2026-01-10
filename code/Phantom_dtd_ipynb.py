@@ -724,13 +724,13 @@ show_15_bvals(np.real(recon_fmac3.squeeze()))
 show_15_bvals(np.real(recon_fmac4.squeeze()))
 show_15_bvals(np.real(recon_fmac5.squeeze()))
 # %%
-plot_recon_vs_ivim(recon_fmac2_b_delta_1, ivim, bvals, points, recon_label="2 basis b_delta_1", ivim_scale=1.0)
-plot_recon_vs_ivim(recon_fmac3_b_delta_1, ivim, bvals, points, recon_label="3 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac2_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="2 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac3_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="3 basis b_delta_1", ivim_scale=1.0)
 show_15_bvals(np.real(recon_fmac2_b_delta_1.squeeze()))
 show_15_bvals(np.real(recon_fmac3_b_delta_1.squeeze()))
 # %%
-plot_recon_vs_ivim(recon_fmac4_b_delta_1, ivim, bvals, points, recon_label="4 basis b_delta_1", ivim_scale=1.0)
-plot_recon_vs_ivim(recon_fmac5_b_delta_1, ivim, bvals, points, recon_label="5 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac4_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="4 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac5_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="5 basis b_delta_1", ivim_scale=1.0)
 # %%
 recon_fmac2 = np.real(recon_fmac2.squeeze())
 # %%
