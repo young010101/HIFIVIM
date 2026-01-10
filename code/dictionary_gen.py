@@ -13,7 +13,31 @@ import multiprocessing
 import os
 import cfl
 from utils import ivim_model
-from bart import bart
+try:
+    from bart import bart
+except ModuleNotFoundError:
+    import sys
+    # Try to locate BART's Python bindings via environment hints
+    bart_python_env = os.getenv("PYTHONPATH")
+    bart_toolbox = os.getenv("BART_TOOLBOX_PATH")
+
+    candidates = []
+    if bart_python_env:
+        candidates.append(bart_python_env)
+    if bart_toolbox:
+        candidates.append(os.path.join(bart_toolbox, "python"))
+        candidates.append(os.path.join(bart_toolbox, "python3"))
+
+    for p in candidates:
+        if p and os.path.isdir(p) and p not in sys.path:
+            sys.path.insert(0, p)
+    try:
+        from bart import bart
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "Cannot import 'bart'. Ensure BART Python path is on PYTHONPATH or BART_TOOLBOX_PATH is set. Tried: "
+            + ", ".join([str(x) for x in candidates])
+        ) from e
 
 description="Script to generate IVIM dictionary generation and basis estimation for reconstruction.\n" \
             "15 b-values are 0, 5, 7, 10, 15, 20, 30, 40,50, 60, 100, 200, 400, 700, 1000 "

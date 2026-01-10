@@ -6,6 +6,32 @@ import emcee
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
 from skimage.metrics import structural_similarity as ssim
+import os
+try:
+    from bart import bart
+except ModuleNotFoundError:
+    import sys
+    # Try to locate BART's Python bindings via environment hints
+    bart_python_env = os.getenv("PYTHONPATH")
+    bart_toolbox = os.getenv("BART_TOOLBOX_PATH")
+
+    candidates = []
+    if bart_python_env:
+        candidates.append(bart_python_env)
+    if bart_toolbox:
+        candidates.append(os.path.join(bart_toolbox, "python"))
+        candidates.append(os.path.join(bart_toolbox, "python3"))
+
+    for p in candidates:
+        if p and os.path.isdir(p) and p not in sys.path:
+            sys.path.insert(0, p)
+    try:
+        from bart import bart
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "Cannot import 'bart'. Ensure BART Python path is on PYTHONPATH or BART_TOOLBOX_PATH is set. Tried: "
+            + ", ".join([str(x) for x in candidates])
+        ) from e
 from bart import bart
 from scipy.optimize import nnls
 from dipy.segment.mask import median_otsu
