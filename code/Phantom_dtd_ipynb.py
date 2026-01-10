@@ -516,15 +516,19 @@ import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %% todo plot, why signal is larger than 10?
 recon_fmac2_squeezed = np.real(recon_fmac2.squeeze())
-plt.plot(bvals, recon_fmac2_squeezed[82, 82, :], 'o-')
-plt.plot(bvals, recon_fmac2_squeezed[50, 50, :], 'o-')
-# plot use ivim and dtd model
-plt.plot(bvals, ivim[82, 82, :] * 170, 'x--')
-plt.plot(bvals, ivim[50, 50, :] * 170, 'x--')
+points = [(82, 82), (50, 50), (30, 130), (100, 60)]
+plt.figure()
+colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
+legend_entries = []
+for (i, j), c in zip(points, colors):
+    plt.plot(bvals, recon_fmac2_squeezed[i, j, :], marker='o', linestyle='-', color=c)
+    plt.plot(bvals, ivim[i, j, :], marker='x', linestyle='--', color=c)
+    legend_entries.append(f'FMac2 ({i},{j})')
+    legend_entries.append(f'IVIM ({i},{j})')
 plt.xlabel('b-values (s/mm$^2$)')
 plt.ylabel('Signal Intensity')
 plt.title('FMac2 Reconstructed Signal vs. Ground Truth IVIM Signal')
-plt.legend(['FMac2 (82,82)', 'FMac2 (50,50)', 'IVIM (82,82)', 'IVIM (50,50)'])
+plt.legend(legend_entries)
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
