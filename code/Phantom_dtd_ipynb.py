@@ -289,11 +289,18 @@ composite_ivim = add_phase(args, ivim,
                             show=True)  # 164 x 164 x 15 - but now with different phase for each b-value.
 print(composite_ivim.shape)
 
+composite_ivim_b_delta_1 = add_phase(args, ivim_b_delta_1, show=True)
+print(composite_ivim_b_delta_1.shape)
+
 # %%
 composite_ivim = add_noise(composite_ivim, 20, return_img=False)
+composite_ivim_b_delta_1 = add_noise(composite_ivim_b_delta_1, 20, return_img=False)
 # %%
 composite_ivim_sens, sens_maps = add_sens_maps(args, composite_ivim, show=True)  # add_sens_maps... 164x164x16x15
 sens_maps_expand = np.expand_dims(sens_maps, axis=2)
+
+composite_ivim_sens_b_delta_1, sens_maps_b_delta_1 = add_sens_maps(args, composite_ivim_b_delta_1, show=True)
+sens_maps_b_delta_1_expand = np.expand_dims(sens_maps_b_delta_1, axis=2)
 # %%
 def get_fft(args, composite_ivim_sens, show=True):
 
@@ -316,6 +323,7 @@ def get_fft(args, composite_ivim_sens, show=True):
         plt.show()
     return fft_ivim
 fft_ivim = np.expand_dims(get_fft(args, composite_ivim_sens, show=True), axis=2)  # 164x164x1x16x15
+fft_ivim_b_delta_1 = np.expand_dims(get_fft(args, composite_ivim_sens_b_delta_1, show=True), axis=2)
 # %% sens_maps.shape
 sens_maps = np.expand_dims(sens_maps, axis=2)
 
@@ -340,6 +348,7 @@ x_dim = fft_ivim.shape[0]
 y_dim = fft_ivim.shape[1]
 num_bvals = fft_ivim.shape[-1]
 sens_prelim_fix = np.zeros((x_dim, y_dim, num_bvals), dtype=np.complex128)
+sens_prelim_b_delta_1_fix = np.zeros_like(sens_prelim_fix)
 print(sens_prelim_fix[..., 0].shape)
 print(fft_ivim[..., 0].shape)
 print(sens_maps_expand.shape)
@@ -347,6 +356,7 @@ print(sens_maps_expand.shape)
 for i in range(num_bvals):
     # sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps)
     sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps_expand)
+    sens_prelim_b_delta_1_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim_b_delta_1[...,i], sens_maps_b_delta_1_expand)
 
 
 def show_demo(x):
@@ -382,6 +392,8 @@ def show_15_bvals(x):
     plt.show()
 show_15_bvals(sens_prelim_fix)
 # %%
+show_15_bvals(sens_prelim_b_delta_1_fix)
+# %%
 sens_prelim_fix2 = np.zeros_like(sens_prelim_fix)
 for i in range(num_bvals):
     sens_prelim_fix2[..., i] = bart(1, 'pics -e -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps_expand)
@@ -411,6 +423,7 @@ show = True
 
 # %%
 sense_prelim = sens_prelim_fix2
+sense_prelim_b_delta_1 = sens_prelim_b_delta_1_fix
 # %%
 print(sense_prelim[:, 0, 0])
 if show:
@@ -419,14 +432,20 @@ if show:
 phase_removal = lowres_phaseremoval(sense_prelim)
 print(phase_removal.shape)
 show_15_bvals(phase_removal)
+
+phase_removal_b_delta_1 = lowres_phaseremoval(sense_prelim_b_delta_1)
+print(phase_removal_b_delta_1.shape)
+show_15_bvals(phase_removal_b_delta_1)
 # %%
-composite_sens, _ = get_composite_sens(sense_prelim, sens_maps, visualize="True")  # 164 x 164 x 16 x 15 x 1
+composite_sens, _ = get_composite_sens(sense_prelim, sens_maps_expand, visualize="True")  # 164 x 164 x 16 x 15 x 1
 print(composite_sens.shape)
 show_15_bvals(composite_sens[:,:,5,:, 0])
 show_15_bvals(composite_sens[:,:,:,6, 0])
 composite_sens = np.expand_dims(np.transpose(composite_sens, (0, 1, 4, 2, 3)), axis=4)
 print(composite_sens.shape)
 
+composite_sens_b_delta_1, _ = get_composite_sens(sense_prelim_b_delta_1, sens_maps_b_delta_1_expand, visualize="True")  # 164 x 164 x 16 x 15 x 1
+composite_sens_b_delta_1 = np.expand_dims(np.transpose(composite_sens_b_delta_1, (0, 1, 4, 2, 3)), axis=4)
 # %% Load Basis
 standard_file_dir = '../Standard_Files_dtd'
 
@@ -480,6 +499,8 @@ print(fft_ivim.shape)
 # 164    164    1      16     1      15
 fft_ivim = np.expand_dims(fft_ivim, axis=4)
 print(fft_ivim.shape)
+# %%
+fft_ivim_b_delta_1_expand = np.expand_dims(fft_ivim_b_delta_1, axis=4)
 # %%
 def print_info(x, name="Variable"):
     print(f"{name} shape: {x.shape}, dtype: {x.dtype}")
@@ -618,6 +639,25 @@ recon, recon_fmac5 = llr_recon_with_retry(
     lambda1=0.001,
     lambda2=0.001,
 )
+# %%
+recon_b_delta_1, recon_fmac2_b_delta_1 = llr_recon_with_retry(
+    fft_ivim_b_delta_1_expand,
+    composite_sens_b_delta_1,
+    bases_dtd_bdelta1[2],
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
+recon_b_delta_1, recon_fmac3_b_delta_1 = llr_recon_with_retry(
+    fft_ivim_b_delta_1_expand,
+    composite_sens_b_delta_1,
+    bases_dtd_bdelta1[3],
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
 #%%
 plot_recon_vs_ivim(recon_fmac4, ivim, bvals, points, recon_label="4 basis", ivim_scale=1.0)
 plot_recon_vs_ivim(recon_fmac5, ivim, bvals, points, recon_label="5 basis", ivim_scale=1.0)
@@ -625,6 +665,11 @@ plot_recon_vs_ivim(recon_fmac5, ivim, bvals, points, recon_label="5 basis", ivim
 show_15_bvals(np.real(recon_fmac3.squeeze()))
 show_15_bvals(np.real(recon_fmac4.squeeze()))
 show_15_bvals(np.real(recon_fmac5.squeeze()))
+# %%
+plot_recon_vs_ivim(recon_fmac2_b_delta_1, ivim, bvals, points, recon_label="2 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac3_b_delta_1, ivim, bvals, points, recon_label="3 basis b_delta_1", ivim_scale=1.0)
+show_15_bvals(np.real(recon_fmac2_b_delta_1.squeeze()))
+show_15_bvals(np.real(recon_fmac3_b_delta_1.squeeze()))
 # %%
 recon_fmac2 = np.real(recon_fmac2.squeeze())
 # %%
