@@ -298,7 +298,8 @@ fft_ivim = np.expand_dims(get_fft(args, composite_ivim_sens, show=True), axis=2)
 sens_maps = np.expand_dims(sens_maps, axis=2)
 
 # %% sense_prelim.shape
-sense_prelim = get_initial_sens(fft_ivim, sens_maps)  # 164x164x15
+# sense_prelim = get_initial_sens(fft_ivim, sens_maps)  # 164x164x15
+sense_prelim = np.zeros((1,1,15))
 # %%
 print(sense_prelim.shape)
 print(fft_ivim.shape)
