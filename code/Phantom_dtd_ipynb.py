@@ -501,6 +501,33 @@ def llr_recon_with_retry(
                 time.sleep(delay_seconds)
     raise last_exc
 
+# %% helper: plotting recon vs ivim with shared colors
+def plot_recon_vs_ivim(
+    recon,
+    ivim,
+    bvals,
+    points,
+    recon_label="FMac",
+    ivim_scale=1.0,
+    figure_kwargs=None,
+):
+    import matplotlib.pyplot as plt
+    arr = np.real(recon.squeeze())
+    if figure_kwargs is None:
+        figure_kwargs = {}
+    plt.figure(**figure_kwargs)
+    colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
+    legend_entries = []
+    for (i, j), c in zip(points, colors):
+        plt.plot(bvals, arr[i, j, :], marker="o", linestyle="-", color=c)
+        plt.plot(bvals, ivim[i, j, :], marker="x", linestyle="--", color=c)
+        legend_entries.append(f"{recon_label} ({i},{j})")
+        legend_entries.append(f"IVIM ({i},{j})")
+    plt.xlabel("b-values (s/mm$^2$)")
+    plt.ylabel("Signal Intensity")
+    plt.title(f"{recon_label} Reconstructed Signal vs. Ground Truth IVIM Signal")
+    plt.legend(legend_entries)
+
 # %%
 recon, recon_fmac2 = llr_recon_with_retry(
     fft_ivim,
@@ -514,21 +541,9 @@ recon, recon_fmac2 = llr_recon_with_retry(
 # %% save recon fmac2 to mat
 import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
-# %% todo plot, why signal is larger than 10?
-recon_fmac2_squeezed = np.real(recon_fmac2.squeeze())
+# %% plot recon vs ivim using helper
 points = [(82, 82), (50, 50), (30, 130), (100, 60)]
-plt.figure()
-colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
-legend_entries = []
-for (i, j), c in zip(points, colors):
-    plt.plot(bvals, recon_fmac2_squeezed[i, j, :], marker='o', linestyle='-', color=c)
-    plt.plot(bvals, ivim[i, j, :], marker='x', linestyle='--', color=c)
-    legend_entries.append(f'FMac2 ({i},{j})')
-    legend_entries.append(f'IVIM ({i},{j})')
-plt.xlabel('b-values (s/mm$^2$)')
-plt.ylabel('Signal Intensity')
-plt.title('FMac2 Reconstructed Signal vs. Ground Truth IVIM Signal')
-plt.legend(legend_entries)
+plot_recon_vs_ivim(recon_fmac2, ivim, bvals, points, recon_label="FMac2", ivim_scale=1.0)
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
