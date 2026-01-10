@@ -429,27 +429,42 @@ print(composite_sens.shape)
 
 # %% Load Basis
 standard_file_dir = '../Standard_Files_dtd'
-basis2 = cfl.readcfl(standard_file_dir + '/ivim_basis_2')
-basis3 = cfl.readcfl(standard_file_dir + '/ivim_basis_3')
-basis4 = cfl.readcfl(standard_file_dir + '/ivim_basis_4')
-basis5 = cfl.readcfl(standard_file_dir + '/ivim_basis_5')
-# %%
-print(basis2.shape)
-print(basis3.shape)
-print(basis4.shape)
-print(basis5.shape)
-# %%
-fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-def plot_basis(ax, title="", basis=None, bvals=bvals):
-    ax.plot(bvals, basis.squeeze()[:, :], label=title)
-    ax.set_title(title)
-    ax.set_xlabel('b-values')
-    ax.set_ylabel('Signal Intensity')
-    ax.legend()
-plot_basis(axes[0, 0], title="IVIM Basis 2", basis=basis2)
-plot_basis(axes[0, 1], title="IVIM Basis 3", basis=basis3)
-plot_basis(axes[1, 0], title="IVIM Basis 4", basis=basis4)
-plot_basis(axes[1, 1], title="IVIM Basis 5", basis=basis5)
+
+def load_bases(base_dir, base_name, names):
+    """Load multiple bases from a directory given a list of suffix numbers."""
+    loaded = {}
+    for n in names:
+        loaded[n] = cfl.readcfl(os.path.join(base_dir, f'{base_name}_{n}'))
+    return loaded
+
+def plot_bases_grid(bases_dict, bvals, figsize=(10, 8)):
+    import matplotlib.pyplot as plt
+    names = list(bases_dict.keys())
+    rows = int(np.ceil(len(names) / 2))
+    cols = 2
+    fig, axes = plt.subplots(rows, cols, figsize=figsize)
+    axes = np.atleast_2d(axes)
+    for idx, name in enumerate(names):
+        r, c = divmod(idx, cols)
+        ax = axes[r, c]
+        ax.plot(bvals, bases_dict[name].squeeze()[:, :], label=f"IVIM Basis {name}")
+        ax.set_title(f"IVIM Basis {name}")
+        ax.set_xlabel('b-values')
+        ax.set_ylabel('Signal Intensity')
+        ax.legend()
+    # hide any unused subplots
+    for idx in range(len(names), rows * cols):
+        r, c = divmod(idx, cols)
+        axes[r, c].axis('off')
+    plt.tight_layout()
+
+basis_numbers = [2, 3, 4, 5]
+bases = load_bases(standard_file_dir, "ivim_basis", basis_numbers)
+for n, arr in bases.items():
+    print(f"basis{n} shape: {arr.shape}")
+plot_bases_grid(bases, bvals)
+# todo tmp
+basis2, basis3, basis4, basis5 = bases[2], bases[3], bases[4], bases[5]
 
 # %%
 print(fft_ivim.shape)
