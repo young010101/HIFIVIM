@@ -69,6 +69,11 @@ def get_dicc(s0, d_iso, mu2_iso, mu2_aniso, bvals, i):
 
     signal = dtd_gamma_model(s0, d_iso, mu2_iso, mu2_aniso, bvals)
     return i, signal, (s0, d_iso, mu2_iso, mu2_aniso)
+
+def get_dicc2(s0, d_iso, mu2_iso, mu2_aniso, bvals, i):
+    signal = dtd_gamma_model(s0, d_iso, mu2_iso, mu2_aniso, bvals, b_delta=np.ones(len(bvals)))
+    return i, signal, (s0, d_iso, mu2_iso, mu2_aniso)
+
 def main():
 
     args = parser()
@@ -89,7 +94,8 @@ def main():
     start_time = datetime.datetime.now()
     print("Start time: ", start_time)
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-        results = pool.starmap(get_dicc, args2)
+        # Use b_delta = 1 (tensor anisotropy) version of the model
+        results = pool.starmap(get_dicc2, args2)
         pool.close()
         pool.join()
         results = np.asarray(results, dtype=object)
@@ -109,7 +115,7 @@ def main():
         basis = bart(1, 'transpose 1 6', basis)  # place into correct bart format
         basis = bart(1, 'transpose 0 5', basis)
 
-        cfl.writecfl(os.path.join(args.outdir, 'ivim_basis_{}'.format(args.basis_size)), (basis))
+        cfl.writecfl(os.path.join(args.outdir, 'dtd_bdelta1_basis_{}'.format(args.basis_size)), (basis))
 
         # Visualize Dictionary and Basis
         if args.show_figure:
@@ -130,7 +136,7 @@ def main():
             plt.legend(['$\Phi_1$', '$\Phi_2$', '$\Phi_3$'], fontsize=18)
             plt.show()
 
-    print("Basis set generation complete. Use ivim_basis_{} for LLR + Subspace reconstruction".format(
+    print("Basis set generation complete. Use dtd_bdelta1_basis_{} for LLR + Subspace reconstruction".format(
         args.basis_size))
     print(f"ended in {datetime.datetime.now() - start_time}")
 
