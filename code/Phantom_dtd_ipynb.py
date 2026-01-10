@@ -1,5 +1,6 @@
 # %% run ../../../src/bart/startup.py
 import os
+import time
 import numpy as np
 import multiprocessing
 import datetime
@@ -247,6 +248,7 @@ def make_phantom(args, show=True):
         for idx, (i,j) in enumerate(points):
             plt.subplot(1, len(points), idx+1)
             plt.plot(bvals, phantom_data[i,j], 'o-')
+            plt.plot(bvals, phantom_data_b_delta_1[i,j], 'x--')
             plt.xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
             plt.ylabel('Signal Intensity', fontsize=14, fontweight='bold')
             plt.title('Signal Curve at ({},{})'.format(i,j), fontsize=14, fontweight='bold')
@@ -438,8 +440,49 @@ print_info(composite_sens, "composite_sens")
 print_info(basis2, "basis2")
 
 # %%
-recon, recon_fmac2 = llr_recon(fft_ivim, composite_sens, basis2,
-                                use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
+def llr_recon_with_retry(
+    fft_ivim,
+    composite_sens,
+    basis,
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+    max_retries=5,
+    delay_seconds=0.5,
+):
+    """
+    Attempt llr_recon up to max_retries times before failing.
+    """
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return llr_recon(
+                fft_ivim,
+                composite_sens,
+                basis,
+                use_basis=use_basis,
+                R=R,
+                lambda1=lambda1,
+                lambda2=lambda2,
+            )
+        except Exception as e:
+            last_exc = e
+            print(f"llr_recon attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                time.sleep(delay_seconds)
+    raise last_exc
+
+# %%
+recon, recon_fmac2 = llr_recon_with_retry(
+    fft_ivim,
+    composite_sens,
+    basis2,
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
 # %% save recon fmac2 to mat
 import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
@@ -461,14 +504,35 @@ print_info(recon_fmac2.squeeze(), "recon_fmac2.squeeze()")
 plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
 # %%
-recon, recon_fmac3 = llr_recon(fft_ivim, composite_sens, basis3,
-                                use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
+recon, recon_fmac3 = llr_recon_with_retry(
+    fft_ivim,
+    composite_sens,
+    basis3,
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
 # %%
-recon, recon_fmac4 = llr_recon(fft_ivim, composite_sens, basis4,
-                                use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
+recon, recon_fmac4 = llr_recon_with_retry(
+    fft_ivim,
+    composite_sens,
+    basis4,
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
 
-recon, recon_fmac5 = llr_recon(fft_ivim, composite_sens, basis5,
-                                use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after
+recon, recon_fmac5 = llr_recon_with_retry(
+    fft_ivim,
+    composite_sens,
+    basis5,
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+)
 # %%
 show_15_bvals(np.real(recon_fmac3.squeeze()))
 show_15_bvals(np.real(recon_fmac4.squeeze()))
