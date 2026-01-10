@@ -47,7 +47,7 @@ if __name__ == "__main__":
 		else:
 			img2d = v
 		im = ax.imshow(img2d, cmap=cmap)
-		ax.set_title(k)
+		ax.set_title(k, fontsize=20)
 		ax.axis("off")
 		fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 	for ax in axes[n:]:
