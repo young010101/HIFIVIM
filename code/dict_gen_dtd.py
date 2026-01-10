@@ -12,7 +12,6 @@ import matplotlib
 import multiprocessing
 import os
 import cfl
-from utils import dtd_gamma_model
 try:
     from bart import bart
 except ModuleNotFoundError:
@@ -38,6 +37,7 @@ except ModuleNotFoundError:
             "Cannot import 'bart'. Ensure BART Python path is on PYTHONPATH or BART_TOOLBOX_PATH is set. Tried: "
             + ", ".join([str(x) for x in candidates])
         ) from e
+from utils import dtd_gamma_model
 
 description="Script to generate IVIM dictionary generation and basis estimation for reconstruction.\n" \
             "15 b-values are 0, 5, 7, 10, 15, 20, 30, 40,50, 60, 100, 200, 400, 700, 1000 "
