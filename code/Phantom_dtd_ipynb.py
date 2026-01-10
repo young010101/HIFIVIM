@@ -31,7 +31,7 @@ else:
     print(f"Created directory {args.outdir}")
 
 # bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
-bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
+bvals = np.asarray([0, 7, 10, 15, 20, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
 
 
 # %% make phantom
@@ -100,11 +100,13 @@ def dtd_gamma_model(
     # ---- gamma model signal ----
     s = sw * (1 + bvals * mu2 / d_iso) ** (-d_iso**2 / mu2)
     
-    if np.isnan(s).any():
-        print("NaN encountered in dtd_gamma_model with parameters:")
-        print(f"s0={s0}, d_iso={d_iso}, mu2_iso={mu2_iso}, mu2_aniso={mu2_aniso}")
-        print(f"bvals={bvals}")
-        raise ValueError("NaN encountered in dtd_gamma_model output.")
+    # if np.isnan(s).any():
+    #     print("NaN encountered in dtd_gamma_model with parameters:")
+    #     print(f"s0={s0}, d_iso={d_iso}, mu2_iso={mu2_iso}, mu2_aniso={mu2_aniso}")
+    #     print(f"bvals={bvals}")
+    #     raise ValueError("NaN encountered in dtd_gamma_model output.")
+    if (s > s0).any():
+        print("Warning: Signal greater than baseline encountered in dtd_gamma_model.")
 
     return np.real(s)
 
@@ -239,7 +241,7 @@ def make_phantom(args, show=True):
 
 
 Dt, Fp, Dp, ivim, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
-ivim = ivim * 1000
+ivim = ivim
 # %%
 print(ivim.shape)
 if True:
@@ -281,8 +283,18 @@ sens_maps = np.expand_dims(sens_maps, axis=2)
 # %% sense_prelim.shape
 sense_prelim = get_initial_sens(fft_ivim, sens_maps)  # 164x164x15
 # %%
+print(sense_prelim.shape)
 print(fft_ivim.shape)
 print(sens_maps.shape)
+# %%
+fig, axes = plt.subplots(3, sense_prelim.shape[2] // 3, figsize=(15, 5))
+ax = axes.ravel()
+for i in range(sense_prelim.shape[2]):
+    ax[i].imshow(np.abs(sense_prelim[:, :, i]), cmap='gray')
+    ax[i].set_title(f'Sensitivity Map Magnitude - Coil {i+1}')
+    ax[i].axis('off')
+    plt.colorbar(ax[i].images[0], ax=ax[i])
+plt.show()
 # %%
 x_dim = fft_ivim.shape[0]
 y_dim = fft_ivim.shape[1]
@@ -368,7 +380,7 @@ composite_sens = np.expand_dims(np.transpose(composite_sens, (0, 1, 4, 2, 3)), a
 print(composite_sens.shape)
 
 # %% Load Basis
-standard_file_dir = '../Standard_Files'
+standard_file_dir = '../Standard_Files_dtd'
 basis2 = cfl.readcfl(standard_file_dir + '/ivim_basis_2')
 basis3 = cfl.readcfl(standard_file_dir + '/ivim_basis_3')
 basis4 = cfl.readcfl(standard_file_dir + '/ivim_basis_4')
