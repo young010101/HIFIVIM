@@ -465,6 +465,11 @@ for n, arr in bases.items():
 plot_bases_grid(bases, bvals)
 # todo tmp
 basis2, basis3, basis4, basis5 = bases[2], bases[3], bases[4], bases[5]
+# %%
+bases_dtd_bdelta1 = load_bases(standard_file_dir, "dtd_bdelta1_basis", basis_numbers)
+for n, arr in bases_dtd_bdelta1.items():
+    print(f"dtd_bdelta1_basis{n} shape: {arr.shape}")
+plot_bases_grid(bases_dtd_bdelta1, bvals)
 
 # %%
 print(fft_ivim.shape)
