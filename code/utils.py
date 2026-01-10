@@ -83,7 +83,7 @@ def dtd_gamma_model(
         Signal S(b)
     """
 
-    bvals = np.asarray(bvals)
+    bvals = np.asarray(bvals) * 1e-3  # convert to s/um^2
 
     # ---- baseline weighting (series-dependent S0) ----
     if rs is not None and s_ind is not None:

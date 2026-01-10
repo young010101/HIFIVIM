@@ -37,6 +37,7 @@ bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 100
 # %% make phantom
 def make_phantom(args, show=True):
     import nibabel as nib
+    import matplotlib.pyplot as plt
     slice = 90
 
 
@@ -45,12 +46,10 @@ def make_phantom(args, show=True):
     phantom = phantom / phantom.max() * 4.  # scale to 0-3.
 
     Dt, Fp, Dp = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
-    phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], 15))
-    # todo: 为什么需要 mask？
+    phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], bvals.shape[0]))
     WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(Dt), np.zeros_like(Dt), \
                                               np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt)
 
-    # todo: center 是做什么的？
     center = (45,100)
     height, width = phantom.shape
 
@@ -72,29 +71,29 @@ def make_phantom(args, show=True):
         for j in range(phantom.shape[1]):
             if WMH_mask1[i,j] == 1:
                 Dt[i, j] = 0.0012
-                Fp[i, j] = 0.16
-                Dp[i, j] = 0.025
+                Fp[i, j] = 0.96
+                Dp[i, j] = 0.925
             elif WMH_mask2[i, j] == 1:
                 Dt[i, j] = 0.0014
-                Fp[i, j] = 0.17
-                Dp[i, j] = 0.028
+                Fp[i, j] = 0.97
+                Dp[i, j] = 0.928
             elif WMH_mask3[i, j] == 1:
                 Dt[i, j] = 0.0013
-                Fp[i, j] = 0.165
-                Dp[i, j] = 0.027
+                Fp[i, j] = 0.965
+                Dp[i, j] = 0.927
             else:
                 if j < 101 and j > 65 and i > 62 and i < 103:
                     Dt[i, j] = 0.0006 if phantom[i, j] > 2.5 else 0.0005 if phantom[i, j] > 1.7 else 0.003 if phantom[
                                                                                                                   i, j] > 0 else 0
-                    Fp[i, j] = 0.07 if phantom[i, j] > 2.5 else 0.06 if phantom[i, j] > 1.7 else 0.25 if phantom[
-                                                                                                             i, j] > 0 else 0
-                    Dp[i, j] = 0.045 if phantom[i, j] > 2.5 else 0.055 if phantom[i, j] > 1.7 else 0.02 if phantom[ i, j] > 0 else 0
+                    Fp[i, j] = 0.7 if phantom[i, j] > 2.5 else 0.6 if phantom[i, j] > 1.7 else 2.5 if phantom[
+                                                                                                            i, j] > 0 else 0
+                    Dp[i, j] = 0.45 if phantom[i, j] > 2.5 else 0.55 if phantom[i, j] > 1.7 else 0.2 if phantom[ i, j] > 0 else 0
                 else:
                     Dt[i, j] = 0.0006 if phantom[i, j] > 2.35 else 0.0009 if phantom[i, j] > 1.7 else 0.003 if phantom[
                                                                                                                   i, j] > 0 else 0
-                    Fp[i, j] = 0.07 if phantom[i, j] > 2.35 else 0.14 if phantom[i, j] > 1.7 else 0.2 if phantom[
+                    Fp[i, j] = 0.7 if phantom[i, j] > 2.35 else 1.4 if phantom[i, j] > 1.7 else 2 if phantom[
                                                                                                             i, j] > 0 else 0
-                    Dp[i, j] = 0.045 if phantom[i, j] > 2.35 else 0.03 if phantom[i, j] > 1.7 else 0.02 if phantom[
+                    Dp[i, j] = 0.45 if phantom[i, j] > 2.35 else 0.3 if phantom[i, j] > 1.7 else 0.2 if phantom[
                                                                                                               i, j] > 0 else 0
             if Dt[i,j] == 0.0006:
                 WMmask[i,j] = 1
@@ -106,7 +105,7 @@ def make_phantom(args, show=True):
                 CSFmask[i, j] = 1
 
 
-            phantom_data[i,j] = ivim_model(Fp[i,j], Dt[i,j], Dp[i,j], bvals)
+            phantom_data[i,j] = ivim_model(10, Fp[i,j], Dt[i,j], Dp[i,j], bvals)
             phantom_data[i,j][Dt[i,j] == 0] =0
 
 
@@ -127,7 +126,7 @@ def make_phantom(args, show=True):
 
         im = axes[1].imshow(np.rot90(Dt), cmap=cmap)
         axes[1].set_xticks([]), axes[1].set_yticks([])
-        axes[1].set_title('D', fontsize=16, fontweight='bold'), im.set_clim(0.0003, 0.0015)
+        axes[1].set_title('MD', fontsize=16, fontweight='bold'), im.set_clim(0.0003, 0.0015)
         cax = fig.add_axes([axes[1].get_position().x1 + 0.005,
                             axes[1].get_position().y0, 0.01, axes[1].get_position().height])
         cbar = plt.colorbar(axes[1].images[0], cax=cax)
@@ -135,14 +134,14 @@ def make_phantom(args, show=True):
 
         im = axes[2].imshow(np.rot90(Fp), cmap=cmap)
         axes[2].set_xticks([]), axes[2].set_yticks([])
-        axes[2].set_title('f', fontsize=16, fontweight='bold'), im.set_clim(0.04, 0.2)
+        axes[2].set_title('$V_I$', fontsize=16, fontweight='bold'), im.set_clim()
         cax = fig.add_axes([axes[2].get_position().x1 + 0.005,
                             axes[2].get_position().y0, 0.01, axes[2].get_position().height])
         cbar = plt.colorbar(axes[2].images[0], cax=cax)
 
         im = axes[3].imshow(np.rot90(Dp), cmap=cmap)
         axes[3].set_xticks([]), axes[3].set_yticks([])
-        axes[3].set_title('D*', fontsize=16, fontweight='bold'), im.set_clim(0.01, 0.06)
+        axes[3].set_title('$V_A$', fontsize=16, fontweight='bold'), im.set_clim()
         cax = fig.add_axes([axes[3].get_position().x1 + 0.005,
                             axes[3].get_position().y0, 0.01, axes[3].get_position().height])
         cbar = plt.colorbar(axes[3].images[0], cax=cax)
@@ -153,7 +152,7 @@ def make_phantom(args, show=True):
         plt.figure(figsize=(15,3))
         for i in range(5):
             plt.subplot(1,5,i+1)
-            plt.imshow(np.rot90(phantom_data[...,(i+3)*2]), cmap='gray'), plt.clim(0.2,1), plt.axis('off')
+            plt.imshow(np.rot90(phantom_data[...,(i+3)*2]), cmap='gray'), plt.clim(), plt.axis('off')
             plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
 
         plt.show()
