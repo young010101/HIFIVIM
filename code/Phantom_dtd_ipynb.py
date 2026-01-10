@@ -522,7 +522,7 @@ def plot_recon_vs_ivim(
         plt.plot(bvals, arr[i, j, :], marker="o", linestyle="-", color=c)
         plt.plot(bvals, ivim[i, j, :], marker="x", linestyle="--", color=c)
         legend_entries.append(f"{recon_label} ({i},{j})")
-        legend_entries.append(f"IVIM ({i},{j})")
+        legend_entries.append(f"dtd ({i},{j})")
     plt.xlabel("b-values (s/mm$^2$)")
     plt.ylabel("Signal Intensity")
     plt.title(f"{recon_label} Reconstructed Signal vs. Ground Truth IVIM Signal")
@@ -543,7 +543,7 @@ import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %% plot recon vs ivim using helper
 points = [(82, 82), (50, 50), (30, 130), (100, 60)]
-plot_recon_vs_ivim(recon_fmac2, ivim, bvals, points, recon_label="FMac2", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac2, ivim, bvals, points, recon_label="2 basis", ivim_scale=1.0)
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
