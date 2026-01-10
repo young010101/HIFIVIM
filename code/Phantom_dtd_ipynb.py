@@ -241,6 +241,18 @@ def make_phantom(args, show=True):
 
         plt.show()
 
+        # ########### select some point to plot signal curve ########################
+        plt.figure(figsize=(15,3))
+        points = [(82,82), (50,50), (30,130), (100,60)]
+        for idx, (i,j) in enumerate(points):
+            plt.subplot(1, len(points), idx+1)
+            plt.plot(bvals, phantom_data[i,j], 'o-')
+            plt.xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
+            plt.ylabel('Signal Intensity', fontsize=14, fontweight='bold')
+            plt.title('Signal Curve at ({},{})'.format(i,j), fontsize=14, fontweight='bold')
+            plt.grid()
+        
+
     return Dt, Fp, Dp, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
                                       np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
 
