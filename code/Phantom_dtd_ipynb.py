@@ -2,6 +2,7 @@
 import os
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 import multiprocessing
 import datetime
 from argparse import ArgumentParser
@@ -843,7 +844,7 @@ def pub_figure(basis2:list, basis3:list, basis4:list,  basis5:list, lowres:list,
     from Phantom_utils import calc_rmse
 
     fig, axes = plt.subplots(3, 7, figsize=(10, 10))
-    labels = ['D', 'f', 'D*']
+    labels = ['MD', 'V_I', 'V_A']
     titles=['Ground-Truth', '2 Bases', '3 Bases', '4 Bases', '5 Bases', 'Phase Removal', 'Conventional']
     cmap='inferno'
 
@@ -907,5 +908,6 @@ for k, v in data_sel.items():
 
 sub2_dt_gamma = [data_sel['dtd_gamma_MD'], data_sel['dtd_gamma_Vi'], data_sel['dtd_gamma_Va']]
 
+GTs = [Dt, Fp, Dp]  # define GTs again for clarity
 pub_figure(sub2_dt_gamma, GTs, GTs, GTs, GTs, GTs, GTs)
 # %%
