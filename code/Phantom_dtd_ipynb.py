@@ -280,7 +280,7 @@ def make_phantom(args, show=True):
 
 mean_diff, var_iso, var_aniso, dtd_gamma, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
 # %%
-points = [(82, 82), (50, 50), (30, 130), (100, 60)]
+points = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 plt.figure(figsize=(15,3))
 for idx, (i, j) in enumerate(points):
     ax = plt.subplot(1, len(points), idx + 1)
@@ -525,7 +525,7 @@ def plot_bases_grid(bases_dict, bvals, figsize=(10, 8)):
     plt.tight_layout()
 
 basis_numbers = [2, 3, 4, 5]
-bases = load_bases(standard_file_dir, "ivim_basis", basis_numbers)
+bases = load_bases(standard_file_dir, "dtd_bdelta0_basis", basis_numbers)
 for n, arr in bases.items():
     print(f"basis{n} shape: {arr.shape}")
 plot_bases_grid(bases, bvals)
