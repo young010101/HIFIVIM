@@ -278,7 +278,18 @@ def make_phantom(args, show=True):
 
 
 mean_diff, var_iso, var_aniso, dtd_gamma, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+# %%
 dtd_gamma = dtd_gamma
+points = [(82, 82), (50, 50), (30, 130), (100, 60)]
+plt.figure(figsize=(15,3))
+for idx, (i, j) in enumerate(points):
+    plt.subplot(1, len(points), idx+1)
+    plt.plot(bvals, dtd_gamma[i,j], 'o-')
+    plt.plot(bvals, ivim_b_delta_1[i,j], 'x--')
+    plt.xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
+    plt.ylabel('Signal Intensity', fontsize=14, fontweight='bold')
+    plt.title('Signal Curve at ({},{})'.format(i,j), fontsize=14, fontweight='bold')
+    plt.grid()
 # %%
 phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
 affine = phantom.affine
@@ -627,7 +638,6 @@ recon, recon_fmac2 = llr_recon_with_retry(
 import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %% plot recon vs ivim using helper
-points = [(82, 82), (50, 50), (30, 130), (100, 60)]
 plot_recon_vs_ivim(recon_fmac2, dtd_gamma, bvals, points, recon_label="2 basis", ivim_scale=1.0)
 # visualize points on the phantom image (use b0 ivim magnitude)
 plot_points_on_image(dtd_gamma[:, :, 6], points, title="Selected points on phantom (b0)")
