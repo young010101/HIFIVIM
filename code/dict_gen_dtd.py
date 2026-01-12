@@ -83,8 +83,8 @@ bvals = np.asarray([0, 7, 10, 15, 20, 40, 50, 60, 100, 200, 400, 700, 1000, 1400
 size = 90
 s0 = 10
 d_iso = np.linspace(0.1, 3.5, size)  # 0, 0.4
-mu2_iso = np.linspace(1e-6, 5, size)  # try it
-mu2_aniso = np.linspace(1e-6, 5, size)
+mu2_iso = np.linspace(1e-6, 2, size)  # try it
+mu2_aniso = np.linspace(1e-6, 2, size)
 size = int(size * size * size)
 ivim_dicc = np.zeros((size, len(bvals)))
 
