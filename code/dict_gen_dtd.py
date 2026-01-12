@@ -85,7 +85,7 @@ s0 = 10
 d_iso = np.linspace(0.001, 4, size)  # 0, 0.4
 mu2_iso = np.linspace(1e-6, 5, size)  # try it
 mu2_aniso = np.linspace(1e-6, 5, size)
-size = int(size * size * size * size)
+size = int(size * size * size)
 ivim_dicc = np.zeros((size, len(bvals)))
 
 ## Code to generate the dictionary
@@ -103,6 +103,10 @@ with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
         ivim_dicc[i] = results[i, 1]
 end_time = datetime.datetime.now()
 print("End time: ", end_time)
+
+# %% ensure dictionary validity
+print(f"Dictionary shape: {ivim_dicc.shape}")
+print(f"size: {size}")
 
 # %%
 ### Code to Extract Basis Set #####
