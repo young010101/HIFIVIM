@@ -144,25 +144,25 @@ def make_phantom(args, show=True):
     phantom[phantom < 200] = 0
     phantom = phantom / phantom.max() * 4.  # scale to 0-3.
 
-    Dt, Fp, Dp = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
+    md, vi, va = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
     phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], bvals.shape[0]))
     phantom_data_b_delta_1 = np.zeros_like(phantom_data)
-    WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(Dt), np.zeros_like(Dt), \
-                                              np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt), np.zeros_like(Dt)
+    WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(md), np.zeros_like(md), \
+                                              np.zeros_like(md), np.zeros_like(md), np.zeros_like(md), np.zeros_like(md)
 
     center = (45,100)
     height, width = phantom.shape
 
-    WMH_mask1 = np.zeros_like(Dt)
+    WMH_mask1 = np.zeros_like(md)
     y, x = np.ogrid[:height, :width]
     radius = 5
     WMH_mask1[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
 
-    WMH_mask2 = np.zeros_like(Dt)
+    WMH_mask2 = np.zeros_like(md)
     center, radius = (53,60), 3.5
     WMH_mask2[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
 
-    WMH_mask3 = np.zeros_like(Dt)
+    WMH_mask3 = np.zeros_like(md)
     center, radius = (60,100), 3
     WMH_mask3[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
 
@@ -170,45 +170,45 @@ def make_phantom(args, show=True):
     for i in range(phantom.shape[0]):
         for j in range(phantom.shape[1]):
             if WMH_mask1[i,j] == 1:
-                Dt[i, j] = 0.0012
-                Fp[i, j] = 0.96
-                Dp[i, j] = 0.925
+                md[i, j] = 0.0012
+                vi[i, j] = 0.96
+                va[i, j] = 0.925
             elif WMH_mask2[i, j] == 1:
-                Dt[i, j] = 0.0014
-                Fp[i, j] = 0.97
-                Dp[i, j] = 0.928
+                md[i, j] = 0.0014
+                vi[i, j] = 0.97
+                va[i, j] = 0.928
             elif WMH_mask3[i, j] == 1:
-                Dt[i, j] = 0.0013
-                Fp[i, j] = 0.965
-                Dp[i, j] = 0.927
+                md[i, j] = 0.0013
+                vi[i, j] = 0.965
+                va[i, j] = 0.927
             else:
                 if j < 101 and j > 65 and i > 62 and i < 103:
-                    Dt[i, j] = 0.0006 if phantom[i, j] > 2.5 else 0.0005 if phantom[i, j] > 1.7 else 0.003 if phantom[
+                    md[i, j] = 0.0006 if phantom[i, j] > 2.5 else 0.0005 if phantom[i, j] > 1.7 else 0.003 if phantom[
                                                                                                                   i, j] > 0 else 0
-                    Fp[i, j] = 0.7 if phantom[i, j] > 2.5 else 0.6 if phantom[i, j] > 1.7 else 2.5 if phantom[
+                    vi[i, j] = 0.7 if phantom[i, j] > 2.5 else 0.6 if phantom[i, j] > 1.7 else 2.5 if phantom[
                                                                                                             i, j] > 0 else 0
-                    Dp[i, j] = 0.45 if phantom[i, j] > 2.5 else 0.55 if phantom[i, j] > 1.7 else 0.2 if phantom[ i, j] > 0 else 0
+                    va[i, j] = 0.45 if phantom[i, j] > 2.5 else 0.55 if phantom[i, j] > 1.7 else 0.2 if phantom[ i, j] > 0 else 0
                 else:
-                    Dt[i, j] = 0.0006 if phantom[i, j] > 2.35 else 0.0009 if phantom[i, j] > 1.7 else 0.003 if phantom[
+                    md[i, j] = 0.0006 if phantom[i, j] > 2.35 else 0.0009 if phantom[i, j] > 1.7 else 0.003 if phantom[
                                                                                                                   i, j] > 0 else 0
-                    Fp[i, j] = 0.7 if phantom[i, j] > 2.35 else 1.4 if phantom[i, j] > 1.7 else 2 if phantom[
+                    vi[i, j] = 0.7 if phantom[i, j] > 2.35 else 1.4 if phantom[i, j] > 1.7 else 2 if phantom[
                                                                                                             i, j] > 0 else 0
-                    Dp[i, j] = 0.45 if phantom[i, j] > 2.35 else 0.3 if phantom[i, j] > 1.7 else 0.2 if phantom[
+                    va[i, j] = 0.45 if phantom[i, j] > 2.35 else 0.3 if phantom[i, j] > 1.7 else 0.2 if phantom[
                                                                                                               i, j] > 0 else 0
-            if Dt[i,j] == 0.0006:
+            if md[i,j] == 0.0006:
                 WMmask[i,j] = 1
-            elif Dt[i, j] == 0.0005:
+            elif md[i, j] == 0.0005:
                 BGmask[i, j] = 1
-            elif Dt[i, j] == 0.0009:
+            elif md[i, j] == 0.0009:
                 GMmask[i, j] = 1
-            elif Dt[i, j] == 0.003:
+            elif md[i, j] == 0.003:
                 CSFmask[i, j] = 1
 
 
-            phantom_data[i,j] = ivim_model(10, Fp[i,j], Dt[i,j], Dp[i,j], bvals)
-            phantom_data[i,j][Dt[i,j] == 0] =0
-            phantom_data_b_delta_1[i,j] = ivim_model(10, Fp[i,j], Dt[i,j], Dp[i,j], bvals, b_delta=np.ones_like(bvals))
-            phantom_data_b_delta_1[i,j][Dt[i,j] == 0] =0
+            phantom_data[i,j] = ivim_model(10, vi[i,j], md[i,j], va[i,j], bvals)
+            phantom_data[i,j][md[i,j] == 0] =0
+            phantom_data_b_delta_1[i,j] = ivim_model(10, vi[i,j], md[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
+            phantom_data_b_delta_1[i,j][md[i,j] == 0] =0
 
 
     if show:
@@ -226,7 +226,7 @@ def make_phantom(args, show=True):
         axes[0].set_title('Phantom', fontsize=16, fontweight='bold')
         plt.colorbar(axes[0].images[0], ax=axes[0], fraction=0.046, pad=0.04)
 
-        im = axes[1].imshow(np.rot90(Dt), cmap=cmap)
+        im = axes[1].imshow(np.rot90(md), cmap=cmap)
         axes[1].set_xticks([]), axes[1].set_yticks([])
         axes[1].set_title('MD', fontsize=16, fontweight='bold'), im.set_clim(0.0003, 0.0015)
         cax = fig.add_axes([axes[1].get_position().x1 + 0.005,
@@ -234,14 +234,14 @@ def make_phantom(args, show=True):
         cbar = plt.colorbar(axes[1].images[0], cax=cax)
 
 
-        im = axes[2].imshow(np.rot90(Fp), cmap=cmap)
+        im = axes[2].imshow(np.rot90(vi), cmap=cmap)
         axes[2].set_xticks([]), axes[2].set_yticks([])
         axes[2].set_title('$V_I$', fontsize=16, fontweight='bold'), im.set_clim()
         cax = fig.add_axes([axes[2].get_position().x1 + 0.005,
                             axes[2].get_position().y0, 0.01, axes[2].get_position().height])
         cbar = plt.colorbar(axes[2].images[0], cax=cax)
 
-        im = axes[3].imshow(np.rot90(Dp), cmap=cmap)
+        im = axes[3].imshow(np.rot90(va), cmap=cmap)
         axes[3].set_xticks([]), axes[3].set_yticks([])
         axes[3].set_title('$V_A$', fontsize=16, fontweight='bold'), im.set_clim()
         cax = fig.add_axes([axes[3].get_position().x1 + 0.005,
@@ -273,11 +273,11 @@ def make_phantom(args, show=True):
             plt.grid()
         
 
-    return Dt, Fp, Dp, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
+    return md, vi, va, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
                                       np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
 
 
-Dt, Fp, Dp, ivim, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+mean_diff, var_iso, var_aniso, ivim, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
 ivim = ivim
 # %%
 phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
@@ -306,7 +306,7 @@ if True:
 
     plt.show()
 # %%
-tmp_list = [Dt, Fp, Dp]
+tmp_list = [mean_diff, var_iso, var_aniso]
 WMmask, GMmask, CSFmask, BGmask, WMH_mask1, WMH_mask2, WMH_mask3 = masks
 masks = [WMmask, GMmask, BGmask, WMH_mask1, WMH_mask2, WMH_mask3]
 # WMmask.shape, WMmask.max()
@@ -816,7 +816,7 @@ with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
     Dtlowres, Dplowres, Fplowres = results[..., 0], results[..., 1], results[..., 2]
 
 print(datetime.datetime.now() - start)
-CSFmask = np.rot90(Dt.copy())
+CSFmask = np.rot90(mean_diff.copy())
 CSFmask[CSFmask < 0.0025] = 0
 CSFmask[CSFmask >= 0.0025] = 1
 CSFmask[Dtsub2 > 0.003] = 1
@@ -828,9 +828,9 @@ Dtsub5, Fpsub5, Dpsub5 = Dtsub5 * abs((1 - CSFmask)), Fpsub5 * abs((1 - CSFmask)
 Dtsens, Fpsens, Dpsens = Dtsens * abs((1 - CSFmask)), Fpsens * abs((1 - CSFmask)), Dpsens * abs((1 - CSFmask))
 Dtlowres, Fplowres, Dplowres = Dtlowres * abs((1 - CSFmask)), Fplowres * abs((1 - CSFmask)), Dplowres * abs(
     (1 - CSFmask))
-Dt, Fp, Dp = np.rot90(Dt) * abs((1 - CSFmask)), np.rot90(Fp) * abs((1 - CSFmask)), np.rot90(Dp) * abs((1 - CSFmask))
+mean_diff, var_iso, var_aniso = np.rot90(mean_diff) * abs((1 - CSFmask)), np.rot90(var_iso) * abs((1 - CSFmask)), np.rot90(var_aniso) * abs((1 - CSFmask))
 
-GTs = [Dt, Fp, Dp]
+GTs = [mean_diff, var_iso, var_aniso]
 mags = [Dtsens, Fpsens, Dpsens]
 sub2 = [Dtsub2, Fpsub2, Dpsub2]
 sub3 = [Dtsub3, Fpsub4, Dpsub3]
@@ -908,6 +908,6 @@ for k, v in data_sel.items():
 
 sub2_dt_gamma = [data_sel['dtd_gamma_MD'], data_sel['dtd_gamma_Vi'], data_sel['dtd_gamma_Va']]
 
-GTs = [Dt, Fp, Dp]  # define GTs again for clarity
+GTs = [mean_diff, var_iso, var_aniso]  # define GTs again for clarity
 pub_figure(sub2_dt_gamma, GTs, GTs, GTs, GTs, GTs, GTs)
 # %%
