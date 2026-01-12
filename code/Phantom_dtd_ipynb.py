@@ -97,7 +97,7 @@ def dtd_gamma_model(
         Signal S(b)
     """
 
-    bvals = np.asarray(bvals) * 1e-3  # convert to s/um^2
+    bvals = np.asarray(bvals) * 1e-3  # convert to ms/um^2, identical to MATLAB code in md-dmri
 
     # ---- baseline weighting (series-dependent S0) ----
     if rs is not None and s_ind is not None:
@@ -205,9 +205,9 @@ def make_phantom(args, show=True):
                 CSFmask[i, j] = 1
 
 
-            phantom_data[i,j] = ivim_model(10, vi[i,j], md[i,j], va[i,j], bvals)
+            phantom_data[i,j] = ivim_model(10, md[i,j], vi[i,j], va[i,j], bvals)
             phantom_data[i,j][md[i,j] == 0] =0
-            phantom_data_b_delta_1[i,j] = ivim_model(10, vi[i,j], md[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
+            phantom_data_b_delta_1[i,j] = ivim_model(10, md[i,j], vi[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
             phantom_data_b_delta_1[i,j][md[i,j] == 0] =0
 
 
