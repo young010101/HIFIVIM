@@ -170,7 +170,7 @@ def make_phantom(args, show=True):
     for i in range(phantom.shape[0]):
         for j in range(phantom.shape[1]):
             if WMH_mask1[i,j] == 1:
-                # md[i, j] = 0.0012
+                # md is stored in μm²/ms units; here md = 1.2 (≈ 0.0012 mm²/s)
                 md[i, j] = 1.2
                 vi[i, j] = 0.96
                 va[i, j] = 0.925
@@ -196,13 +196,13 @@ def make_phantom(args, show=True):
                                                                                                             i, j] > 0 else 0
                     va[i, j] = 0.45 if phantom[i, j] > 2.35 else 0.3 if phantom[i, j] > 1.7 else 0.2 if phantom[
                                                                                                               i, j] > 0 else 0
-            if md[i,j] == 0.6:
+            if np.isclose(md[i,j], 0.6):
                 WMmask[i,j] = 1
-            elif md[i, j] == 0.5:
+            elif np.isclose(md[i, j], 0.5):
                 BGmask[i, j] = 1
-            elif md[i, j] == 0.9:
+            elif np.isclose(md[i, j], 0.9):
                 GMmask[i, j] = 1
-            elif md[i, j] == 3:
+            elif np.isclose(md[i, j], 3):
                 CSFmask[i, j] = 1
 
 
@@ -229,7 +229,7 @@ def make_phantom(args, show=True):
 
         im = axes[1].imshow(np.rot90(md), cmap=cmap)
         axes[1].set_xticks([]), axes[1].set_yticks([])
-        axes[1].set_title('MD', fontsize=16, fontweight='bold'), im.set_clim(0.0003, 0.0015)
+        axes[1].set_title('MD', fontsize=16, fontweight='bold'), im.set_clim(0.3, 1.5)
         cax = fig.add_axes([axes[1].get_position().x1 + 0.005,
                             axes[1].get_position().y0, 0.01, axes[1].get_position().height])
         cbar = plt.colorbar(axes[1].images[0], cax=cax)
@@ -280,18 +280,20 @@ def make_phantom(args, show=True):
 
 mean_diff, var_iso, var_aniso, dtd_gamma, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
 # %%
-dtd_gamma = dtd_gamma
 points = [(82, 82), (50, 50), (30, 130), (100, 60)]
 plt.figure(figsize=(15,3))
 for idx, (i, j) in enumerate(points):
-    plt.subplot(1, len(points), idx+1)
-    plt.plot(bvals, dtd_gamma[i,j], 'o-')
-    plt.plot(bvals, ivim_b_delta_1[i,j], 'x--')
-    plt.xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
-    plt.ylabel('Signal Intensity', fontsize=14, fontweight='bold')
-    plt.title('Signal Curve at ({},{})'.format(i,j), fontsize=14, fontweight='bold')
-    plt.grid()
-    plt.legend(['$b_{\Delta}=0$', '$b_{\Delta}=1$'])
+    ax = plt.subplot(1, len(points), idx + 1)
+
+    ax.plot(bvals, dtd_gamma[i, j], 'o-', label=r'$b_{\Delta}=0$')
+    ax.plot(bvals, ivim_b_delta_1[i, j], 'x--', label=r'$b_{\Delta}=1$')
+
+    ax.set_xlabel(r'b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
+    ax.set_title(f'Signal Curve at ({i},{j})', fontsize=14, fontweight='bold')
+
+    ax.grid(True)
+    ax.legend()
 # %%
 phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
 affine = phantom.affine
