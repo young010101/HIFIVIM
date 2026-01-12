@@ -76,7 +76,7 @@ def get_dicc2(s0, d_iso, mu2_iso, mu2_aniso, bvals, i):
     return i, signal, (s0, d_iso, mu2_iso, mu2_aniso)
 
 
-args = parser()
+args = parser(["--outdir", "../Standard_Files_dtd"])
 # bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
 bvals = np.asarray([0, 7, 10, 15, 20, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
 
