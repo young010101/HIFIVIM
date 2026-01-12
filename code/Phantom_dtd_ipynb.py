@@ -279,14 +279,17 @@ def make_phantom(args, show=True):
 Dt, Fp, Dp, ivim, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
 ivim = ivim
 # %%
+phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
+affine = phantom.affine
+# %%
 if ivim.ndim == 4:
-    save_nifti(ivim, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32)
-    save_nifti(ivim_b_delta_1, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32)
+    save_nifti(ivim, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
+    save_nifti(ivim_b_delta_1, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32, affine=affine)
 elif ivim.ndim == 3:
     ivim_expand = ivim[:, :, np.newaxis, :]
-    save_nifti(ivim_expand, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32)
+    save_nifti(ivim_expand, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
     ivim_b_delta_1_expand = ivim_b_delta_1[:, :, np.newaxis, :]
-    save_nifti(ivim_b_delta_1_expand, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32)
+    save_nifti(ivim_b_delta_1_expand, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32, affine=affine)
 else:
     raise ValueError(f"ivim data does not have expected number of dimensions {ivim.shape}.")
 # %%
