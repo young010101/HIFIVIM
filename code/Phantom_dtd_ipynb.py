@@ -24,6 +24,22 @@ def parser(argv=None):
 
 # %%
 args = parser(["--outdir", "../Phantom"])
+
+
+# Save key recon results as NIfTI (.nii.gz)
+def save_nifti(volume, out_path, dtype=np.float32, affine=None):
+    import nibabel as nib
+    vol = np.asarray(volume, dtype=dtype)
+    if vol.ndim == 2:
+        vol = vol[..., np.newaxis]
+    if affine is None:
+        affine = np.eye(4)
+    img = nib.Nifti1Image(vol, affine)
+    nib.save(img, out_path)
+
+outdir_nifti = os.path.join(args.outdir, 'phan_cyan/DATA/brain/NII')
+
+
 # args.__dict__
 # args = SimpleNamespace(phantom_dir='phantom_1.0mm_normal_fuzzy', outdir='/tmp/out')
 # %%
@@ -262,6 +278,17 @@ def make_phantom(args, show=True):
 
 Dt, Fp, Dp, ivim, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
 ivim = ivim
+# %%
+if ivim.ndim == 4:
+    save_nifti(ivim, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32)
+    save_nifti(ivim_b_delta_1, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32)
+elif ivim.ndim == 3:
+    ivim_expand = ivim[:, :, np.newaxis, :]
+    save_nifti(ivim_expand, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32)
+    ivim_b_delta_1_expand = ivim_b_delta_1[:, :, np.newaxis, :]
+    save_nifti(ivim_b_delta_1_expand, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32)
+else:
+    raise ValueError(f"ivim data does not have expected number of dimensions {ivim.shape}.")
 # %%
 print(ivim.shape)
 if True:
@@ -692,18 +719,6 @@ sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_all.mat'), {
     'recon_fmac5_b_delta_1': recon_fmac5_b_delta_1,
 }) 
  
-# Save key recon results as NIfTI (.nii.gz)
-def save_nifti(volume, out_path, dtype=np.float32, affine=None):
-    import nibabel as nib
-    vol = np.asarray(volume, dtype=dtype)
-    if vol.ndim == 2:
-        vol = vol[..., np.newaxis]
-    if affine is None:
-        affine = np.eye(4)
-    img = nib.Nifti1Image(vol, affine)
-    nib.save(img, out_path)
-
-outdir_nifti = os.path.join(args.outdir, 'phan_cyan/DATA/brain/NII')
 try:
     save_nifti(np.real(recon_fmac2.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2.nii.gz'))
     save_nifti(np.real(recon_fmac3.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3.nii.gz'))
