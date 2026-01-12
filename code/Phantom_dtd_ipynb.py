@@ -73,11 +73,11 @@ def dtd_gamma_model(
     Parameters
     ----------
     bvals : array
-        b-values (s/mm^2)
+        b-values (ms/um^2)
     s0 : float
         Baseline signal
     d_iso : float
-        Mean diffusivity (MD)
+        Mean diffusivity (MD) (um^2/ms)
     mu2_iso : float
         Isotropic variance
     mu2_aniso : float
@@ -170,38 +170,39 @@ def make_phantom(args, show=True):
     for i in range(phantom.shape[0]):
         for j in range(phantom.shape[1]):
             if WMH_mask1[i,j] == 1:
-                md[i, j] = 0.0012
+                # md[i, j] = 0.0012
+                md[i, j] = 1.2
                 vi[i, j] = 0.96
                 va[i, j] = 0.925
             elif WMH_mask2[i, j] == 1:
-                md[i, j] = 0.0014
+                md[i, j] = 1.4
                 vi[i, j] = 0.97
                 va[i, j] = 0.928
             elif WMH_mask3[i, j] == 1:
-                md[i, j] = 0.0013
+                md[i, j] = 1.3
                 vi[i, j] = 0.965
                 va[i, j] = 0.927
             else:
                 if j < 101 and j > 65 and i > 62 and i < 103:
-                    md[i, j] = 0.0006 if phantom[i, j] > 2.5 else 0.0005 if phantom[i, j] > 1.7 else 0.003 if phantom[
+                    md[i, j] = 0.6 if phantom[i, j] > 2.5 else 0.5 if phantom[i, j] > 1.7 else 3 if phantom[
                                                                                                                   i, j] > 0 else 0
                     vi[i, j] = 0.7 if phantom[i, j] > 2.5 else 0.6 if phantom[i, j] > 1.7 else 2.5 if phantom[
                                                                                                             i, j] > 0 else 0
                     va[i, j] = 0.45 if phantom[i, j] > 2.5 else 0.55 if phantom[i, j] > 1.7 else 0.2 if phantom[ i, j] > 0 else 0
                 else:
-                    md[i, j] = 0.0006 if phantom[i, j] > 2.35 else 0.0009 if phantom[i, j] > 1.7 else 0.003 if phantom[
+                    md[i, j] = 0.6 if phantom[i, j] > 2.35 else 0.9 if phantom[i, j] > 1.7 else 3 if phantom[
                                                                                                                   i, j] > 0 else 0
                     vi[i, j] = 0.7 if phantom[i, j] > 2.35 else 1.4 if phantom[i, j] > 1.7 else 2 if phantom[
                                                                                                             i, j] > 0 else 0
                     va[i, j] = 0.45 if phantom[i, j] > 2.35 else 0.3 if phantom[i, j] > 1.7 else 0.2 if phantom[
                                                                                                               i, j] > 0 else 0
-            if md[i,j] == 0.0006:
+            if md[i,j] == 0.6:
                 WMmask[i,j] = 1
-            elif md[i, j] == 0.0005:
+            elif md[i, j] == 0.5:
                 BGmask[i, j] = 1
-            elif md[i, j] == 0.0009:
+            elif md[i, j] == 0.9:
                 GMmask[i, j] = 1
-            elif md[i, j] == 0.003:
+            elif md[i, j] == 3:
                 CSFmask[i, j] = 1
 
 
@@ -290,6 +291,7 @@ for idx, (i, j) in enumerate(points):
     plt.ylabel('Signal Intensity', fontsize=14, fontweight='bold')
     plt.title('Signal Curve at ({},{})'.format(i,j), fontsize=14, fontweight='bold')
     plt.grid()
+    plt.legend(['$b_{\Delta}=0$', '$b_{\Delta}=1$'])
 # %%
 phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
 affine = phantom.affine
