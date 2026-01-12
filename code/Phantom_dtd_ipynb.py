@@ -609,6 +609,7 @@ def plot_points_on_image(img, points, colors=None, title="Points on image"):
         colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
     for (i, j), c in zip(points, colors):
         plt.plot(j, i, marker='o', color=c, markersize=6)
+        plt.text(j + 2, i - 2, f"({i},{j})", color=c, fontsize=8)
     plt.title(title)
     plt.axis('off')
 
@@ -910,4 +911,11 @@ sub2_dt_gamma = [data_sel['dtd_gamma_MD'], data_sel['dtd_gamma_Vi'], data_sel['d
 
 GTs = [mean_diff, var_iso, var_aniso]  # define GTs again for clarity
 pub_figure(sub2_dt_gamma, GTs, GTs, GTs, GTs, GTs, GTs)
+# %%
+print(f"mean diffusivity shape: {mean_diff.shape}")
+print("mean diffusivity at selected points:")
+for x, y in points:
+    print(f"mean diffusivity: GT: {mean_diff[x, y]}, fit: {sub2_dt_gamma[0][x, y]}")
+    print(f"var isotropic:    GT: {var_iso[x, y]}, fit: {sub2_dt_gamma[1][x, y]}")
+    print(f"var anisotropic:  GT: {var_aniso[x, y]}, fit: {sub2_dt_gamma[2][x, y]}")
 # %%
