@@ -52,7 +52,7 @@ font = {
 matplotlib.rc('font', **font)
 
 
-def parser():
+def parser(args=None):
 
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--outdir", type=str, help='Directory to save dictionary to')
@@ -60,7 +60,7 @@ def parser():
     parser.add_argument("--basis_size", type=int, default=2)
     parser.add_argument("--show_figure", type=bool, default=True)
 
-    args=parser.parse_args()
+    args=parser.parse_args(args)
 
     return args
 
@@ -104,6 +104,7 @@ with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
 end_time = datetime.datetime.now()
 print("End time: ", end_time)
 
+# %%
 ### Code to Extract Basis Set #####
 if args.make_basis:
     print("Now extracting basis set ...")
@@ -114,9 +115,9 @@ if args.make_basis:
     basis = bart(1, 'extract 1 0 {}'.format(args.basis_size), U)  # extract basis
     basis = bart(1, 'transpose 1 6', basis)  # place into correct bart format
     basis = bart(1, 'transpose 0 5', basis)
-
+# %%
     cfl.writecfl(os.path.join(args.outdir, 'dtd_bdelta1_basis_{}'.format(args.basis_size)), (basis))
-
+# %%
     # Visualize Dictionary and Basis
     if args.show_figure:
         plt.figure()
@@ -135,7 +136,7 @@ if args.make_basis:
         plt.ylabel('Signal Intensity [AU]', fontsize=22, fontweight='bold')
         plt.legend(['$\Phi_1$', '$\Phi_2$', '$\Phi_3$'], fontsize=18)
         plt.show()
-
+# %%
 print("Basis set generation complete. Use dtd_bdelta1_basis_{} for LLR + Subspace reconstruction".format(
     args.basis_size))
 print(f"ended in {datetime.datetime.now() - start_time}")
@@ -144,3 +145,5 @@ print(f"ended in {datetime.datetime.now() - start_time}")
 if __name__ == "__main__":
     pass
 
+
+# %%
