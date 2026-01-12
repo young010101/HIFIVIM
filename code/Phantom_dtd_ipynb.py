@@ -277,30 +277,30 @@ def make_phantom(args, show=True):
                                       np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
 
 
-mean_diff, var_iso, var_aniso, ivim, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
-ivim = ivim
+mean_diff, var_iso, var_aniso, dtd_gamma, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+dtd_gamma = dtd_gamma
 # %%
 phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
 affine = phantom.affine
 # %%
-if ivim.ndim == 4:
-    save_nifti(ivim, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
+if dtd_gamma.ndim == 4:
+    save_nifti(dtd_gamma, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
     save_nifti(ivim_b_delta_1, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32, affine=affine)
-elif ivim.ndim == 3:
-    ivim_expand = ivim[:, :, np.newaxis, :]
+elif dtd_gamma.ndim == 3:
+    ivim_expand = dtd_gamma[:, :, np.newaxis, :]
     save_nifti(ivim_expand, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
     ivim_b_delta_1_expand = ivim_b_delta_1[:, :, np.newaxis, :]
     save_nifti(ivim_b_delta_1_expand, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32, affine=affine)
 else:
-    raise ValueError(f"ivim data does not have expected number of dimensions {ivim.shape}.")
+    raise ValueError(f"ivim data does not have expected number of dimensions {dtd_gamma.shape}.")
 # %%
-print(ivim.shape)
+print(dtd_gamma.shape)
 if True:
     import matplotlib.pyplot as plt
     plt.figure(figsize=(15,3))
     for i in range(5):
         plt.subplot(1,5,i+1)
-        plt.imshow(np.rot90(ivim[...,(i+3)*2]), cmap='gray'), plt.clim(), plt.axis('off')
+        plt.imshow(np.rot90(dtd_gamma[...,(i+3)*2]), cmap='gray'), plt.axis('off')
         plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
         plt.colorbar()
 
@@ -317,7 +317,7 @@ masks = [WMmask, GMmask, BGmask, WMH_mask1, WMH_mask2, WMH_mask3]
 # WMH_mask3.shape, WMH_mask3.max()
 
 # %%
-composite_ivim = add_phase(args, ivim,
+composite_ivim = add_phase(args, dtd_gamma,
                             show=True)  # 164 x 164 x 15 - but now with different phase for each b-value.
 print(composite_ivim.shape)
 
@@ -628,9 +628,9 @@ import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %% plot recon vs ivim using helper
 points = [(82, 82), (50, 50), (30, 130), (100, 60)]
-plot_recon_vs_ivim(recon_fmac2, ivim, bvals, points, recon_label="2 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac2, dtd_gamma, bvals, points, recon_label="2 basis", ivim_scale=1.0)
 # visualize points on the phantom image (use b0 ivim magnitude)
-plot_points_on_image(ivim[:, :, 6], points, title="Selected points on phantom (b0)")
+plot_points_on_image(dtd_gamma[:, :, 6], points, title="Selected points on phantom (b0)")
 plot_points_on_image(recon_fmac2.squeeze()[:, :, 6], points, title="Selected points on recon_fmac2 (b0)")
 # can you plot the points on the phantom image?
 
@@ -651,7 +651,7 @@ recon, recon_fmac3 = llr_recon_with_retry(
     lambda2=0.001,
 )
 #%%
-plot_recon_vs_ivim(recon_fmac3, ivim, bvals, points, recon_label="3 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac3, dtd_gamma, bvals, points, recon_label="3 basis", ivim_scale=1.0)
 # %%
 recon, recon_fmac4 = llr_recon_with_retry(
     fft_ivim,
@@ -737,8 +737,8 @@ try:
 except Exception as e:
     print(f"Failed to save NIfTI files: {e}")
 #%%
-plot_recon_vs_ivim(recon_fmac4, ivim, bvals, points, recon_label="4 basis", ivim_scale=1.0)
-plot_recon_vs_ivim(recon_fmac5, ivim, bvals, points, recon_label="5 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac4, dtd_gamma, bvals, points, recon_label="4 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac5, dtd_gamma, bvals, points, recon_label="5 basis", ivim_scale=1.0)
 # %%
 show_15_bvals(np.real(recon_fmac3.squeeze()))
 show_15_bvals(np.real(recon_fmac4.squeeze()))
