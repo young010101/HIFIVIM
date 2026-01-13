@@ -419,13 +419,13 @@ def show_demo(x):
 
 show_demo(sens_prelim_fix)
 # %%
-def show_15_bvals(x):
+def show_15_bvals(x, cmap='gray'):
     print(x.shape)
     fix, axes = plt.subplots(3, 5, figsize=(15, 9))
     axes_flat = axes.ravel()
     last_im = None
     for i, ax in enumerate(axes_flat):
-        last_im = ax.imshow(np.abs(x[:, :, i]), cmap='gray')
+        last_im = ax.imshow(np.abs(x[:, :, i]), cmap=cmap)
         ax.set_title(f'Prelim Sens Map Magnitude - Bval {bvals[i]}')
         ax.axis('off')
     # Add a single shared colorbar for the grid
@@ -654,6 +654,15 @@ print_info(recon_fmac2, "recon_fmac2")
 print_info(recon_fmac2.squeeze(), "recon_fmac2.squeeze()")
 plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
+# %% residual
+residual_fmac2_real = dtd_gamma - np.real(recon_fmac2.squeeze())
+residual_fmac2_abs = dtd_gamma - abs(recon_fmac2.squeeze())
+show_15_bvals(residual_fmac2_real, cmap='seismic')
+show_15_bvals(residual_fmac2_abs, cmap='seismic')
+show_15_bvals(residual_fmac2_real, cmap='coolwarm')
+show_15_bvals(residual_fmac2_abs, cmap='coolwarm')
+show_15_bvals(residual_fmac2_real[30:120, 30:120, :], cmap='seismic')
+show_15_bvals(residual_fmac2_real[30:120, 30:120, :], cmap='coolwarm')
 # %%
 recon, recon_fmac3 = llr_recon_with_retry(
     fft_ivim,
