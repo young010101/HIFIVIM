@@ -85,11 +85,11 @@ def dtd_gamma_model(
     Parameters
     ----------
     bvals : array
-        b-values (s/mm^2)
+        b-values (ms/um^2)
     s0 : float
         Baseline signal
     d_iso : float
-        Mean diffusivity (MD)
+        Mean diffusivity (MD) (um^2/ms)
     mu2_iso : float
         Isotropic variance
     mu2_aniso : float
@@ -109,7 +109,7 @@ def dtd_gamma_model(
         Signal S(b)
     """
 
-    bvals = np.asarray(bvals) * 1e-3  # convert to s/um^2
+    bvals = np.asarray(bvals) * 1e-3  # convert to s/um^2, identical to MATLAB code in md-dmri
 
     # ---- baseline weighting (series-dependent S0) ----
     if rs is not None and s_ind is not None:
@@ -131,6 +131,14 @@ def dtd_gamma_model(
 
     # ---- gamma model signal ----
     s = sw * (1 + bvals * mu2 / d_iso) ** (-d_iso**2 / mu2)
+
+    # if np.isnan(s).any():
+    #     print("NaN encountered in dtd_gamma_model with parameters:")
+    #     print(f"s0={s0}, d_iso={d_iso}, mu2_iso={mu2_iso}, mu2_aniso={mu2_aniso}")
+    #     print(f"bvals={bvals}")
+    #     raise ValueError("NaN encountered in dtd_gamma_model output.")
+    if (s > s0).any():
+        print("Warning: Signal greater than baseline encountered in dtd_gamma_model.")
 
     return np.real(s)
 

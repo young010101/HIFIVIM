@@ -887,13 +887,13 @@ def pub_figure(basis2:list, basis3:list, basis4:list,  basis5:list, lowres:list,
     cmap='inferno'
 
     for row in range(axes.shape[0]):
-        clim_ = [(0.0003, 0.003), (0.0, 2.5), (0.0, 0.99), (0, 1.5)]
+        clim_ = [(0.3, 3), (0.0, 2.5), (0.0, 0.99), (0, 1.5)]
         for col in range(axes.shape[1]):
             images = GTs if col == 0 else basis2 if col == 1 else basis3 if col == 2 else \
                 basis4 if col == 3 else basis5 if col == 4 else lowres if col == 5 else mags
             im = axes[row, col].imshow(images[row],
                                        cmap=cmap)
-            # im.set_clim(clim_[row])
+            im.set_clim(clim_[row])
 
             if col != 0:
                 nrmse, ssim = calc_rmse(images[row], GTs[row], nrsme=True)
@@ -937,17 +937,27 @@ def load_dtd_gamma(directory, names=("dtd_gamma_Vi", "dtd_gamma_Va", "dtd_gamma_
 				break
 	return data
 
+    
+def wrap_load_dtd_gamma(directory, debug=False):
+    data_sel = load_dtd_gamma(directory)
+    if debug:
+        for k, v in data_sel.items():
+            print(f"{k}: shape={v.shape}, dtype={v.dtype}")
+    dt_gamma = [data_sel['dtd_gamma_MD'], data_sel['dtd_gamma_Vi'], data_sel['dtd_gamma_Va']]
+    return dt_gamma
 
-directory = '/data/users/cyang/repos/HIFIVIM/Phantom/phan_cyan/processed/brain'
-data_sel = load_dtd_gamma(directory)
-print("selected dtd_gamma loaded:")
-for k, v in data_sel.items():
-    print(f"{k}: shape={v.shape}, dtype={v.dtype}")
+root = '/data/users/cyang/repos/HIFIVIM/Phantom/phan_cyan/processed'
+directory = os.path.join(root, 'brain')
+main_dt_gamma = wrap_load_dtd_gamma(directory, debug=True)
 
-sub2_dt_gamma = [data_sel['dtd_gamma_MD'], data_sel['dtd_gamma_Vi'], data_sel['dtd_gamma_Va']]
+directory = os.path.join(root, 'brain_basis2')
+sub2_dt_gamma = wrap_load_dtd_gamma(directory)
+
+directory = os.path.join(root, 'brain_gt')
+dt_gamma_gt = wrap_load_dtd_gamma(directory)
 
 GTs = [mean_diff, var_iso, var_aniso]  # define GTs again for clarity
-pub_figure(sub2_dt_gamma, GTs, GTs, GTs, GTs, GTs, GTs)
+pub_figure(sub2_dt_gamma, main_dt_gamma, dt_gamma_gt, GTs, GTs, GTs, GTs)
 # %%
 print(f"mean diffusivity shape: {mean_diff.shape}")
 print("mean diffusivity at selected points:")
