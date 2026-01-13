@@ -600,14 +600,14 @@ def plot_recon_vs_ivim(
     figure_kwargs=None,
 ):
     import matplotlib.pyplot as plt
-    arr = np.real(recon.squeeze())
+    recon_mag = np.real(recon.squeeze())
     if figure_kwargs is None:
         figure_kwargs = {}
     plt.figure(**figure_kwargs)
     colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
     legend_entries = []
     for (i, j), c in zip(points, colors):
-        plt.plot(bvals, arr[i, j, :], marker="o", linestyle="-", color=c)
+        plt.plot(bvals, recon_mag[i, j, :], marker="o", linestyle="-", color=c)
         plt.plot(bvals, ivim[i, j, :], marker="x", linestyle="--", color=c)
         legend_entries.append(f"{recon_label} ({i},{j})")
         legend_entries.append(f"dtd ({i},{j})")
@@ -647,7 +647,7 @@ plot_recon_vs_ivim(recon_fmac2, dtd_gamma, bvals, points, recon_label="2 basis",
 plot_points_on_image(dtd_gamma[:, :, 6], points, title="Selected points on phantom (b0)")
 plot_points_on_image(recon_fmac2.squeeze()[:, :, 6], points, title="Selected points on recon_fmac2 (b0)")
 # %%
-fig, axes = plt.subplots(1, 2, figsize=(5, 10))
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 axes[0].hist(dtd_gamma[30:120, 30:120, :].ravel(), bins=50)
 axes[0].set_title("Histogram of dtd_gamma")
 axes[0].set_xlabel("Signal Intensity")
@@ -656,6 +656,10 @@ axes[1].hist(np.abs(recon_fmac2[30:120, 30:120, :]).ravel(), bins=50)
 axes[1].set_title("Histogram of Magnitude of recon_fmac2")
 axes[1].set_xlabel("Signal Intensity")
 axes[1].set_ylabel("Frequency")
+axes[2].hist(np.real(recon_fmac2[30:120, 30:120, :]).ravel(), bins=50)
+axes[2].set_title("Histogram of Real Part of recon_fmac2")
+axes[2].set_xlabel("Signal Intensity")
+axes[2].set_ylabel("Frequency")
 plt.tight_layout()
 plt.show()
 # %%
