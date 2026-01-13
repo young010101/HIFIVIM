@@ -748,15 +748,15 @@ sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_all.mat'), {
 }) 
  
 try:
-    save_nifti(np.real(recon_fmac2.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2.nii.gz'))
-    save_nifti(np.real(recon_fmac3.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3.nii.gz'))
-    save_nifti(np.real(recon_fmac4.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac4.nii.gz'))
-    save_nifti(np.real(recon_fmac5.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac5.nii.gz'))
+    save_nifti(np.real(recon_fmac2.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2.nii.gz'), affine=affine)
+    save_nifti(np.real(recon_fmac3.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3.nii.gz'), affine=affine)
+    save_nifti(np.real(recon_fmac4.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac4.nii.gz'), affine=affine)
+    save_nifti(np.real(recon_fmac5.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac5.nii.gz'), affine=affine)
 
-    save_nifti(np.real(recon_fmac2_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2_b_delta_1.nii.gz'))
-    save_nifti(np.real(recon_fmac3_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3_b_delta_1.nii.gz'))
-    save_nifti(np.real(recon_fmac4_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac4_b_delta_1.nii.gz'))
-    save_nifti(np.real(recon_fmac5_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac5_b_delta_1.nii.gz'))
+    save_nifti(np.real(recon_fmac2_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2_b_delta_1.nii.gz'), affine=affine)
+    save_nifti(np.real(recon_fmac3_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3_b_delta_1.nii.gz'), affine=affine)
+    save_nifti(np.real(recon_fmac4_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac4_b_delta_1.nii.gz'), affine=affine)
+    save_nifti(np.real(recon_fmac5_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac5_b_delta_1.nii.gz'), affine=affine)
 except Exception as e:
     print(f"Failed to save NIfTI files: {e}")
 #%%
