@@ -646,8 +646,18 @@ plot_recon_vs_ivim(recon_fmac2, dtd_gamma, bvals, points, recon_label="2 basis",
 # visualize points on the phantom image (use b0 ivim magnitude)
 plot_points_on_image(dtd_gamma[:, :, 6], points, title="Selected points on phantom (b0)")
 plot_points_on_image(recon_fmac2.squeeze()[:, :, 6], points, title="Selected points on recon_fmac2 (b0)")
-# can you plot the points on the phantom image?
-
+# %%
+fig, axes = plt.subplots(1, 2, figsize=(5, 10))
+axes[0].hist(dtd_gamma[30:120, 30:120, :].ravel(), bins=50)
+axes[0].set_title("Histogram of dtd_gamma")
+axes[0].set_xlabel("Signal Intensity")
+axes[0].set_ylabel("Frequency")
+axes[1].hist(np.abs(recon_fmac2[30:120, 30:120, :]).ravel(), bins=50)
+axes[1].set_title("Histogram of Magnitude of recon_fmac2")
+axes[1].set_xlabel("Signal Intensity")
+axes[1].set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
 # %%
 print_info(recon, "recon")
 print_info(recon_fmac2, "recon_fmac2")
