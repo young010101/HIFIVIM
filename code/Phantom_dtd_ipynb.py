@@ -10,8 +10,8 @@ import cfl
 import nibabel as nib    
 from bart import bart
 from Phantom_utils import add_phase, add_sens_maps, get_fft, \
-    pub_figure, bland_altman_image
-from utils import add_noise, get_initial_sens, lowres_phaseremoval, \
+    bland_altman_image
+from utils import dtd_gamma_model, add_noise, get_initial_sens, lowres_phaseremoval, \
     get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu
 # from utils import dtd_gamma_model as ivim_model
 
@@ -21,6 +21,28 @@ def parser(argv=None):
     parse.add_argument('--phantom_dir', type=str, default='phantom_1.0mm_normal_fuzzy')
     parse.add_argument('--outdir', type=str)
     return parse.parse_args(argv)
+
+    
+def get_fft(args, composite_ivim_sens, show=True):
+
+    fft_ivim = bart(1, 'fft -u 3', composite_ivim_sens)
+    fft_ivim[:, ::2] = 0 # undersample R=2
+    if show:
+        fig, axes = plt.subplots(4, 4, figsize=(10, 10))
+        fig2, axes2 = plt.subplots(4, 4, figsize=(10, 10))
+        for row in range(4):
+            for col in range(4):
+                im1 = axes[row, col].imshow(np.rot90(abs(fft_ivim[:,:, row + col, 9])**.2), cmap='gray')
+                axes[row, col].set_xticks([]), axes[row, col].set_yticks([])
+
+                im2 = axes2[row, col].imshow(np.rot90(abs(fft_ivim[:, :, row + col, 12])**.2), cmap='gray')
+                axes2[row, col].set_xticks([]), axes2[row, col].set_yticks([])
+
+                im1.set_clim(0, 5)
+                im2.set_clim(0,5)
+
+        plt.show()
+    return fft_ivim
 
 
 # %%
@@ -51,94 +73,14 @@ else:
     print(f"Created directory {args.outdir}")
 
 # bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
-bvals = np.asarray([0, 7, 10, 15, 20, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
+# bvals = np.asarray([0, 7, 10, 15, 20, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
+bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 
 
 # %% make phantom
-# debugging
-def dtd_gamma_model(
-    s0,
-    d_iso,
-    mu2_iso,
-    mu2_aniso,
-    bvals,
-    b_delta=None,
-    b_eta=None,
-    rs=None,
-    s_ind=None,
-):
-    """
-    Python equivalent of dtd_gamma_1d_fit2data
-
-    Parameters
-    ----------
-    bvals : array
-        b-values (ms/um^2)
-    s0 : float
-        Baseline signal
-    d_iso : float
-        Mean diffusivity (MD) (um^2/ms)
-    mu2_iso : float
-        Isotropic variance
-    mu2_aniso : float
-        Anisotropic variance
-    b_delta : array or None
-        b-tensor anisotropy
-    b_eta : array or None
-        Asymmetry parameter
-    rs : array or None
-        Relative signal scaling across series
-    s_ind : array or None
-        Series index
-
-    Returns
-    -------
-    s : array
-        Signal S(b)
-    """
-
-    bvals = np.asarray(bvals) * 1e-3  # convert to ms/um^2, identical to MATLAB code in md-dmri
-
-    # ---- baseline weighting (series-dependent S0) ----
-    if rs is not None and s_ind is not None:
-        rs = np.asarray([1.0] + list(rs))
-        sw = s0 * np.sum(
-            (rs[None, :] * (s_ind[:, None] == np.arange(1, len(rs) + 1))),
-            axis=1,
-        )
-    else:
-        sw = s0
-
-    # ---- total diffusional variance ----
-    if b_delta is None:
-        mu2 = mu2_iso
-    else:
-        if b_eta is None:
-            b_eta = 0
-        mu2 = mu2_iso + mu2_aniso * b_delta**2 * (b_eta**2 + 3) / 3
-
-    # ---- gamma model signal ----
-    s = sw * (1 + bvals * mu2 / d_iso) ** (-d_iso**2 / mu2)
-    
-    # if np.isnan(s).any():
-    #     print("NaN encountered in dtd_gamma_model with parameters:")
-    #     print(f"s0={s0}, d_iso={d_iso}, mu2_iso={mu2_iso}, mu2_aniso={mu2_aniso}")
-    #     print(f"bvals={bvals}")
-    #     raise ValueError("NaN encountered in dtd_gamma_model output.")
-    if (s > s0).any():
-        print("Warning: Signal greater than baseline encountered in dtd_gamma_model.")
-
-    return np.real(s)
-
-
-ivim_model = dtd_gamma_model
-
-
-def make_phantom(args, show=True):
+def make_phantom(args, show=True, slice = 90):
     import nibabel as nib
     import matplotlib.pyplot as plt
-    slice = 90
-
 
     phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz')).get_fdata()[..., slice]
     phantom[phantom < 200] = 0
@@ -206,9 +148,9 @@ def make_phantom(args, show=True):
                 CSFmask[i, j] = 1
 
 
-            phantom_data[i,j] = ivim_model(10, md[i,j], vi[i,j], va[i,j], bvals)
+            phantom_data[i,j] = dtd_gamma_model(10, md[i,j], vi[i,j], va[i,j], bvals)
             phantom_data[i,j][md[i,j] == 0] =0
-            phantom_data_b_delta_1[i,j] = ivim_model(10, md[i,j], vi[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
+            phantom_data_b_delta_1[i,j] = dtd_gamma_model(10, md[i,j], vi[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
             phantom_data_b_delta_1[i,j][md[i,j] == 0] =0
 
 
@@ -262,31 +204,33 @@ def make_phantom(args, show=True):
         plt.show()
 
         # ########### select some point to plot signal curve ########################
-        plt.figure(figsize=(15,3))
-        points = [(82,82), (50,50), (30,130), (100,60)]
+        fig, axes = plt.subplots(1, len(points), figsize=(15,3))
         for idx, (i,j) in enumerate(points):
-            plt.subplot(1, len(points), idx+1)
-            plt.plot(bvals, phantom_data[i,j], 'o-')
-            plt.plot(bvals, phantom_data_b_delta_1[i,j], 'x--')
-            plt.xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
-            plt.ylabel('Signal Intensity', fontsize=14, fontweight='bold')
-            plt.title('Signal Curve at ({},{})'.format(i,j), fontsize=14, fontweight='bold')
-            plt.grid()
+            ax = axes[idx]
+            ax.plot(bvals, phantom_data[i,j], 'o-')
+            ax.plot(bvals, phantom_data_b_delta_1[i,j], 'x--')
+            ax.set_xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
+            if idx == 0:
+                ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
+            ax.set_title('({},{})'.format(i,j), fontsize=14, fontweight='bold')
+            ax.grid()
         
 
     return md, vi, va, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
                                       np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
 
 
-mean_diff, var_iso, var_aniso, dtd_gamma, ivim_b_delta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+mean_diff, var_iso, var_aniso, dtd_gamma_bdelta_0, dtd_gamma_bdelta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+dtd_gamma_bdelta_0 = dtd_gamma_bdelta_0 * 1000  # scale to typical signal levels
+dtd_gamma_bdelta_1 = dtd_gamma_bdelta_1 * 1000 
 # %%
 points = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 plt.figure(figsize=(15,3))
 for idx, (i, j) in enumerate(points):
     ax = plt.subplot(1, len(points), idx + 1)
 
-    ax.plot(bvals, dtd_gamma[i, j], 'o-', label=r'$b_{\Delta}=0$')
-    ax.plot(bvals, ivim_b_delta_1[i, j], 'x--', label=r'$b_{\Delta}=1$')
+    ax.plot(bvals, dtd_gamma_bdelta_0[i, j], 'o-', label=r'$b_{\Delta}=0$')
+    ax.plot(bvals, dtd_gamma_bdelta_1[i, j], 'x--', label=r'$b_{\Delta}=1$')
 
     ax.set_xlabel(r'b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
     ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
@@ -294,28 +238,27 @@ for idx, (i, j) in enumerate(points):
 
     ax.grid(True)
     ax.legend()
+# %% get affine
+affine = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz')).affine
 # %%
-phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz'))
-affine = phantom.affine
-# %%
-if dtd_gamma.ndim == 4:
-    save_nifti(dtd_gamma, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
-    save_nifti(ivim_b_delta_1, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32, affine=affine)
-elif dtd_gamma.ndim == 3:
-    ivim_expand = dtd_gamma[:, :, np.newaxis, :]
-    save_nifti(ivim_expand, os.path.join(outdir_nifti, 'ivim_phantom.nii.gz'), dtype=np.float32, affine=affine)
-    ivim_b_delta_1_expand = ivim_b_delta_1[:, :, np.newaxis, :]
-    save_nifti(ivim_b_delta_1_expand, os.path.join(outdir_nifti, 'ivim_phantom_b_delta_1.nii.gz'), dtype=np.float32, affine=affine)
+if dtd_gamma_bdelta_0.ndim == 4:
+    save_nifti(dtd_gamma_bdelta_0, os.path.join(outdir_nifti, 'dtd_phantom_bdelta_0.nii.gz'), dtype=np.float32, affine=affine)
+    save_nifti(dtd_gamma_bdelta_1, os.path.join(outdir_nifti, 'dtd_phantom_bdelta_1.nii.gz'), dtype=np.float32, affine=affine)
+elif dtd_gamma_bdelta_0.ndim == 3:
+    ivim_expand = dtd_gamma_bdelta_0[:, :, np.newaxis, :]
+    save_nifti(ivim_expand, os.path.join(outdir_nifti, 'dtd_phantom_bdelta_0.nii.gz'), dtype=np.float32, affine=affine)
+    ivim_b_delta_1_expand = dtd_gamma_bdelta_1[:, :, np.newaxis, :]
+    save_nifti(ivim_b_delta_1_expand, os.path.join(outdir_nifti, 'dtd_phantom_bdelta_1.nii.gz'), dtype=np.float32, affine=affine)
 else:
-    raise ValueError(f"ivim data does not have expected number of dimensions {dtd_gamma.shape}.")
+    raise ValueError(f"ivim data does not have expected number of dimensions {dtd_gamma_bdelta_0.shape}.")
 # %%
-print(dtd_gamma.shape)
+print(dtd_gamma_bdelta_0.shape)
 if True:
     import matplotlib.pyplot as plt
     plt.figure(figsize=(15,3))
     for i in range(5):
         plt.subplot(1,5,i+1)
-        plt.imshow(np.rot90(dtd_gamma[...,(i+3)*2]), cmap='gray'), plt.axis('off')
+        plt.imshow(np.rot90(dtd_gamma_bdelta_0[...,(i+3)*2]), cmap='gray'), plt.axis('off')
         plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
         plt.colorbar()
 
@@ -332,11 +275,11 @@ masks = [WMmask, GMmask, BGmask, WMH_mask1, WMH_mask2, WMH_mask3]
 # WMH_mask3.shape, WMH_mask3.max()
 
 # %%
-composite_ivim = add_phase(args, dtd_gamma,
+composite_ivim = add_phase(args, dtd_gamma_bdelta_0,
                             show=True)  # 164 x 164 x 15 - but now with different phase for each b-value.
 print(composite_ivim.shape)
 
-composite_ivim_b_delta_1 = add_phase(args, ivim_b_delta_1, show=True)
+composite_ivim_b_delta_1 = add_phase(args, dtd_gamma_bdelta_1, show=True)
 print(composite_ivim_b_delta_1.shape)
 
 # %%
@@ -349,61 +292,22 @@ sens_maps_expand = np.expand_dims(sens_maps, axis=2)
 composite_ivim_sens_b_delta_1, sens_maps_b_delta_1 = add_sens_maps(args, composite_ivim_b_delta_1, show=True)
 sens_maps_b_delta_1_expand = np.expand_dims(sens_maps_b_delta_1, axis=2)
 # %%
-def get_fft(args, composite_ivim_sens, show=True):
-
-    fft_ivim = bart(1, 'fft -u 3', composite_ivim_sens)
-    fft_ivim[:, ::2] = 0 # undersample R=2
-    if show:
-        fig, axes = plt.subplots(4, 4, figsize=(10, 10))
-        fig2, axes2 = plt.subplots(4, 4, figsize=(10, 10))
-        for row in range(4):
-            for col in range(4):
-                im1 = axes[row, col].imshow(np.rot90(abs(fft_ivim[:,:, row + col, 9])**.2), cmap='gray')
-                axes[row, col].set_xticks([]), axes[row, col].set_yticks([])
-
-                im2 = axes2[row, col].imshow(np.rot90(abs(fft_ivim[:, :, row + col, 12])**.2), cmap='gray')
-                axes2[row, col].set_xticks([]), axes2[row, col].set_yticks([])
-
-                im1.set_clim(0, 5)
-                im2.set_clim(0,5)
-
-        plt.show()
-    return fft_ivim
-fft_ivim = np.expand_dims(get_fft(args, composite_ivim_sens, show=True), axis=2)  # 164x164x1x16x15
-fft_ivim_b_delta_1 = np.expand_dims(get_fft(args, composite_ivim_sens_b_delta_1, show=True), axis=2)
-# %% sens_maps.shape
-sens_maps = np.expand_dims(sens_maps, axis=2)
-
-# %% sense_prelim.shape
-# sense_prelim = get_initial_sens(fft_ivim, sens_maps)  # 164x164x15
-sense_prelim = np.zeros((1,1,15))
+fft_bdelta_0 = np.expand_dims(get_fft(args, composite_ivim_sens, show=True), axis=2)  # 164x164x1x16x15
+fft_bdelta_1 = np.expand_dims(get_fft(args, composite_ivim_sens_b_delta_1, show=True), axis=2)
 # %%
-print(sense_prelim.shape)
-print(fft_ivim.shape)
-print(sens_maps.shape)
-# %%
-fig, axes = plt.subplots(3, sense_prelim.shape[2] // 3, figsize=(15, 5))
-ax = axes.ravel()
-for i in range(sense_prelim.shape[2]):
-    ax[i].imshow(np.abs(sense_prelim[:, :, i]), cmap='gray')
-    ax[i].set_title(f'Sensitivity Map Magnitude - Coil {i+1}')
-    ax[i].axis('off')
-    plt.colorbar(ax[i].images[0], ax=ax[i])
-plt.show()
-# %%
-x_dim = fft_ivim.shape[0]
-y_dim = fft_ivim.shape[1]
-num_bvals = fft_ivim.shape[-1]
+x_dim = fft_bdelta_0.shape[0]
+y_dim = fft_bdelta_0.shape[1]
+num_bvals = fft_bdelta_0.shape[-1]
 sens_prelim_fix = np.zeros((x_dim, y_dim, num_bvals), dtype=np.complex128)
 sens_prelim_b_delta_1_fix = np.zeros_like(sens_prelim_fix)
 print(sens_prelim_fix[..., 0].shape)
-print(fft_ivim[..., 0].shape)
+print(fft_bdelta_0[..., 0].shape)
 print(sens_maps_expand.shape)
 
 for i in range(num_bvals):
     # sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps)
-    sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps_expand)
-    sens_prelim_b_delta_1_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim_b_delta_1[...,i], sens_maps_b_delta_1_expand)
+    sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_bdelta_0[...,i], sens_maps_expand)
+    sens_prelim_b_delta_1_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_bdelta_1[...,i], sens_maps_b_delta_1_expand)
 
 
 def show_demo(x):
@@ -426,11 +330,11 @@ def show_15_bvals(x, cmap='gray'):
     last_im = None
     for i, ax in enumerate(axes_flat):
         last_im = ax.imshow(np.abs(x[:, :, i]), cmap=cmap)
-        ax.set_title(f'Prelim Sens Map Magnitude - Bval {bvals[i]}')
+        ax.set_title(f'b_val = {bvals[i]}')
         ax.axis('off')
     # Add a single shared colorbar for the grid
     if last_im is not None:
-        cax = fix.add_axes([axes[-1, -1].get_position().x1 + 0.02,
+        cax = fix.add_axes([axes[-1, -1].get_position().x1 + 0.1,
                            axes[-1, -1].get_position().y0,
                            0.01,
                            axes[0, -1].get_position().y1 - axes[-1, -1].get_position().y0])
@@ -443,7 +347,7 @@ show_15_bvals(sens_prelim_b_delta_1_fix)
 # %%
 sens_prelim_fix2 = np.zeros_like(sens_prelim_fix)
 for i in range(num_bvals):
-    sens_prelim_fix2[..., i] = bart(1, 'pics -e -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps_expand)
+    sens_prelim_fix2[..., i] = bart(1, 'pics -e -S -l2 -r0.001 -i 10', fft_bdelta_0[...,i], sens_maps_expand)
 # %%
 show_15_bvals(sens_prelim_fix2)
 show_15_bvals(composite_ivim)
@@ -484,6 +388,9 @@ phase_removal_b_delta_1 = lowres_phaseremoval(sense_prelim_b_delta_1)
 print(phase_removal_b_delta_1.shape)
 show_15_bvals(phase_removal_b_delta_1)
 # %%
+show_15_bvals(np.angle(sense_prelim))
+show_15_bvals(np.angle(phase_removal))
+# %%
 composite_sens, _ = get_composite_sens(sense_prelim, sens_maps_expand, visualize="True")  # 164 x 164 x 16 x 15 x 1
 print(composite_sens.shape)
 show_15_bvals(composite_sens[:,:,5,:, 0])
@@ -493,6 +400,22 @@ print(composite_sens.shape)
 
 composite_sens_b_delta_1, _ = get_composite_sens(sense_prelim_b_delta_1, sens_maps_b_delta_1_expand, visualize="True")  # 164 x 164 x 16 x 15 x 1
 composite_sens_b_delta_1 = np.expand_dims(np.transpose(composite_sens_b_delta_1, (0, 1, 4, 2, 3)), axis=4)
+# %%
+plt.figure(figsize=(15,3))
+for idx, (i, j) in enumerate(points):
+    ax = plt.subplot(1, len(points), idx + 1)
+
+    ax.plot(bvals, dtd_gamma_bdelta_0[i, j], 'o-', label=r'$b_{\Delta}=0$')
+    ax.plot(bvals, dtd_gamma_bdelta_1[i, j], 'x--', label=r'$b_{\Delta}=1$')
+    ax.plot(bvals, np.real(phase_removal[i, j]), 's-.', label='Prelim Sens Map')
+    ax.plot(bvals, np.abs(phase_removal[i, j]), 'd:', label='Prelim Sens Mag')
+
+    ax.set_xlabel(r'b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
+    ax.set_title(f'Signal Curve at ({i},{j})', fontsize=14, fontweight='bold')
+
+    ax.grid(True)
+    ax.legend()
 # %% Load Basis
 standard_file_dir = '../Standard_Files_dtd'
 
@@ -513,10 +436,10 @@ def plot_bases_grid(bases_dict, bvals, figsize=(10, 8)):
     for idx, name in enumerate(names):
         r, c = divmod(idx, cols)
         ax = axes[r, c]
-        ax.plot(bvals, bases_dict[name].squeeze()[:, :], label=f"IVIM Basis {name}")
-        ax.set_title(f"IVIM Basis {name}")
-        ax.set_xlabel('b-values')
-        ax.set_ylabel('Signal Intensity')
+        ax.plot(bvals, bases_dict[name].squeeze()[:, :], label=f"DTD gamma Basis {name}")
+        ax.set_title(f"DTD gamma Basis {name}")
+        ax.set_xlabel('b-values [s/mm$^2$]')
+        ax.set_ylabel('Signal Intensity [AU]')
         ax.legend()
     # hide any unused subplots
     for idx in range(len(names), rows * cols):
@@ -538,20 +461,20 @@ for n, arr in bases_dtd_bdelta1.items():
 plot_bases_grid(bases_dtd_bdelta1, bvals)
 
 # %%
-print(fft_ivim.shape)
+print(fft_bdelta_0.shape)
 # %%
 # recon_fmac2.shape
 # 0      1      2      3      4      5      6      7      8      9    10   11   12   13   14
 # RO     PH1    PH2    CHA    MAPS   TE     COEFF  COEFF2 ITER
 # 164    164    1      16     1      15
-fft_ivim = np.expand_dims(fft_ivim, axis=4)
-print(fft_ivim.shape)
+fft_bdelta_0 = np.expand_dims(fft_bdelta_0, axis=4)
+print(fft_bdelta_0.shape)
 # %%
-fft_ivim_b_delta_1_expand = np.expand_dims(fft_ivim_b_delta_1, axis=4)
+fft_ivim_b_delta_1_expand = np.expand_dims(fft_bdelta_1, axis=4)
 # %%
 def print_info(x, name="Variable"):
     print(f"{name} shape: {x.shape}, dtype: {x.dtype}")
-print_info(fft_ivim, "fft_ivim")
+print_info(fft_bdelta_0, "fft_ivim")
 print_info(composite_sens, "composite_sens")
 print_info(basis2, "basis2")
 
@@ -630,7 +553,7 @@ def plot_points_on_image(img, points, colors=None, title="Points on image"):
 
 # %%
 recon, recon_fmac2 = llr_recon_with_retry(
-    fft_ivim,
+    fft_bdelta_0,
     composite_sens,
     basis2,
     use_basis=True,
@@ -642,13 +565,13 @@ recon, recon_fmac2 = llr_recon_with_retry(
 import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %% plot recon vs ivim using helper
-plot_recon_vs_ivim(recon_fmac2, dtd_gamma, bvals, points, recon_label="2 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac2, dtd_gamma_bdelta_0, bvals, points, recon_label="2 basis", ivim_scale=1.0)
 # visualize points on the phantom image (use b0 ivim magnitude)
-plot_points_on_image(dtd_gamma[:, :, 6], points, title="Selected points on phantom (b0)")
+plot_points_on_image(dtd_gamma_bdelta_0[:, :, 6], points, title="Selected points on phantom (b0)")
 plot_points_on_image(recon_fmac2.squeeze()[:, :, 6], points, title="Selected points on recon_fmac2 (b0)")
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-axes[0].hist(dtd_gamma[30:120, 30:120, :].ravel(), bins=50)
+axes[0].hist(dtd_gamma_bdelta_0[30:120, 30:120, :].ravel(), bins=50)
 axes[0].set_title("Histogram of dtd_gamma")
 axes[0].set_xlabel("Signal Intensity")
 axes[0].set_ylabel("Frequency")
@@ -669,8 +592,8 @@ print_info(recon_fmac2.squeeze(), "recon_fmac2.squeeze()")
 plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
 # %% residual
-residual_fmac2_real = dtd_gamma - np.real(recon_fmac2.squeeze())
-residual_fmac2_abs = dtd_gamma - abs(recon_fmac2.squeeze())
+residual_fmac2_real = dtd_gamma_bdelta_0 - np.real(recon_fmac2.squeeze())
+residual_fmac2_abs = dtd_gamma_bdelta_0 - abs(recon_fmac2.squeeze())
 show_15_bvals(residual_fmac2_real, cmap='seismic')
 show_15_bvals(residual_fmac2_abs, cmap='seismic')
 show_15_bvals(residual_fmac2_real, cmap='coolwarm')
@@ -679,7 +602,7 @@ show_15_bvals(residual_fmac2_real[30:120, 30:120, :], cmap='seismic')
 show_15_bvals(residual_fmac2_real[30:120, 30:120, :], cmap='coolwarm')
 # %%
 recon, recon_fmac3 = llr_recon_with_retry(
-    fft_ivim,
+    fft_bdelta_0,
     composite_sens,
     basis3,
     use_basis=True,
@@ -688,10 +611,10 @@ recon, recon_fmac3 = llr_recon_with_retry(
     lambda2=0.001,
 )
 #%%
-plot_recon_vs_ivim(recon_fmac3, dtd_gamma, bvals, points, recon_label="3 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac3, dtd_gamma_bdelta_0, bvals, points, recon_label="3 basis", ivim_scale=1.0)
 # %%
 recon, recon_fmac4 = llr_recon_with_retry(
-    fft_ivim,
+    fft_bdelta_0,
     composite_sens,
     basis4,
     use_basis=True,
@@ -701,7 +624,7 @@ recon, recon_fmac4 = llr_recon_with_retry(
 )
 
 recon, recon_fmac5 = llr_recon_with_retry(
-    fft_ivim,
+    fft_bdelta_0,
     composite_sens,
     basis5,
     use_basis=True,
@@ -774,20 +697,20 @@ try:
 except Exception as e:
     print(f"Failed to save NIfTI files: {e}")
 #%%
-plot_recon_vs_ivim(recon_fmac4, dtd_gamma, bvals, points, recon_label="4 basis", ivim_scale=1.0)
-plot_recon_vs_ivim(recon_fmac5, dtd_gamma, bvals, points, recon_label="5 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac4, dtd_gamma_bdelta_0, bvals, points, recon_label="4 basis", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac5, dtd_gamma_bdelta_0, bvals, points, recon_label="5 basis", ivim_scale=1.0)
 # %%
 show_15_bvals(np.real(recon_fmac3.squeeze()))
 show_15_bvals(np.real(recon_fmac4.squeeze()))
 show_15_bvals(np.real(recon_fmac5.squeeze()))
 # %%
-plot_recon_vs_ivim(recon_fmac2_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="2 basis b_delta_1", ivim_scale=1.0)
-plot_recon_vs_ivim(recon_fmac3_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="3 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac2_b_delta_1, dtd_gamma_bdelta_1, bvals, points, recon_label="2 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac3_b_delta_1, dtd_gamma_bdelta_1, bvals, points, recon_label="3 basis b_delta_1", ivim_scale=1.0)
 show_15_bvals(np.real(recon_fmac2_b_delta_1.squeeze()))
 show_15_bvals(np.real(recon_fmac3_b_delta_1.squeeze()))
 # %%
-plot_recon_vs_ivim(recon_fmac4_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="4 basis b_delta_1", ivim_scale=1.0)
-plot_recon_vs_ivim(recon_fmac5_b_delta_1, ivim_b_delta_1, bvals, points, recon_label="5 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac4_b_delta_1, dtd_gamma_bdelta_1, bvals, points, recon_label="4 basis b_delta_1", ivim_scale=1.0)
+plot_recon_vs_ivim(recon_fmac5_b_delta_1, dtd_gamma_bdelta_1, bvals, points, recon_label="5 basis b_delta_1", ivim_scale=1.0)
 # %%
 recon_fmac2 = np.real(recon_fmac2.squeeze())
 # %%
@@ -881,8 +804,8 @@ lowres = [Dtlowres, Fplowres, Dplowres]
 def pub_figure(basis2:list, basis3:list, basis4:list,  basis5:list, lowres:list, mags:list, GTs:list, dki=False):
     from Phantom_utils import calc_rmse
 
-    fig, axes = plt.subplots(3, 7, figsize=(10, 10))
-    labels = ['MD', 'V_I', 'V_A']
+    fig, axes = plt.subplots(3, 7, figsize=(15, 10))
+    labels = ['MD', '$V_I$', '$V_A$']
     titles=['Ground-Truth', '2 Bases', '3 Bases', '4 Bases', '5 Bases', 'Phase Removal', 'Conventional']
     cmap='inferno'
 
