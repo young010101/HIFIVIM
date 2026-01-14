@@ -9,6 +9,7 @@ from Phantom_utils import make_phantom, add_phase, add_sens_maps, get_fft, \
     pub_figure, bland_altman_image
 from utils import add_noise, get_initial_sens, lowres_phaseremoval, \
     get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu
+from cyan_utils import plot_points_on_image
 
 
 def parser(argv=None):
@@ -210,6 +211,31 @@ print_info(recon_fmac2, "recon_fmac2")
 print_info(recon_fmac2.squeeze(), "recon_fmac2.squeeze()")
 plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
+# %%
+points = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
+plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
+plt.plot([p[1] for p in points], [p[0] for p in points], 'o')
+plt.title("Reconstructed Image with Demo Points", fontsize=14, fontweight='bold')
+plt.axis('off')
+plt.show()
+# %%
+plt.figure(figsize=(15,3))
+for i, (x, y) in enumerate(points):
+    plt.subplot(1,5,i+1)
+    demo_line = recon_fmac2.squeeze()[x,y,:]
+    plt.plot(bvals, ivim[x,y,:] / ivim[x,y,0] * demo_line[0], 'o')
+    plt.plot(bvals, np.real(demo_line), '-x')
+    plt.title(f"Point ({x}, {y})", fontsize=14, fontweight='bold')
+    plt.xlabel("b-values (s/mm$^2$)", fontsize=12)
+    plt.ylabel("Signal Intensity", fontsize=12)
+    plt.grid()
+plt.tight_layout()
+plt.show()
+# %%
+demo_line = recon_fmac2.squeeze()[82,82,:]
+plt.plot(bvals, ivim[82,82,:] / ivim[82,82,0] * demo_line[0], 'o')
+plt.plot(bvals, np.real(demo_line), '-x')
+show_15_bvals(np.real(recon_fmac2.squeeze()) - ivim)
 # %%
 recon, recon_fmac3 = llr_recon(fft_ivim, composite_sens, basis3,
                                 use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after

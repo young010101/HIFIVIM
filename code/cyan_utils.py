@@ -9,6 +9,19 @@ def ifft2c(x):
     return np.fft.ifftshift(np.fft.ifft2(np.fft.fftshift(x), axes=(0,1),norm=None))
 
 
+def plot_points_on_image(img, points, colors=None, title="Points on image"):
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.imshow(np.abs(img), cmap='gray')
+    if colors is None:
+        colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
+    for (i, j), c in zip(points, colors):
+        plt.plot(j, i, marker='o', color=c, markersize=6)
+        plt.text(j + 2, i - 2, f"({i},{j})", color=c, fontsize=8)
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
+
 # ----------------------------
 # Forward model (must match your earlier safe version if needed)
 # ----------------------------

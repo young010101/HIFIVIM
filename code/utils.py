@@ -39,6 +39,7 @@ from scipy.ndimage import map_coordinates
 from scipy import stats
 from sklearn.metrics import mean_squared_error
 from skimage.registration import phase_cross_correlation
+import time
 
 '''
 Author: Alan Finkelstein. 
@@ -366,6 +367,40 @@ def llr_recon(data, sens, basis, R=2, lambda1=0.005, lambda2=0.001, use_basis=Fa
             recon = bart(1, 'pics -d 5 -i 300 -S -R L:3:3:0.0001 -R W:3:0:0:0005', data, sens)
 
         return recon
+
+
+def llr_recon_with_retry(
+    fft_ivim,
+    composite_sens,
+    basis,
+    use_basis=True,
+    R=2,
+    lambda1=0.001,
+    lambda2=0.001,
+    max_retries=5,
+    delay_seconds=0.5,
+):
+    """
+    Attempt llr_recon up to max_retries times before failing.
+    """
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return llr_recon(
+                fft_ivim,
+                composite_sens,
+                basis,
+                use_basis=use_basis,
+                R=R,
+                lambda1=lambda1,
+                lambda2=lambda2,
+            )
+        except Exception as e:
+            last_exc = e
+            print(f"llr_recon attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                time.sleep(delay_seconds)
+    raise last_exc
 
 
 def slice_recon(data, bvals, mask, kind='ivim'):

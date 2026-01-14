@@ -12,7 +12,8 @@ from bart import bart
 from Phantom_utils import add_phase, add_sens_maps, get_fft, \
     bland_altman_image
 from utils import dtd_gamma_model, add_noise, get_initial_sens, lowres_phaseremoval, \
-    get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu
+    get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu, llr_recon_with_retry
+from cyan_utils import plot_points_on_image
 # from utils import dtd_gamma_model as ivim_model
 
 
@@ -479,38 +480,6 @@ print_info(composite_sens, "composite_sens")
 print_info(basis2, "basis2")
 
 # %%
-def llr_recon_with_retry(
-    fft_ivim,
-    composite_sens,
-    basis,
-    use_basis=True,
-    R=2,
-    lambda1=0.001,
-    lambda2=0.001,
-    max_retries=5,
-    delay_seconds=0.5,
-):
-    """
-    Attempt llr_recon up to max_retries times before failing.
-    """
-    last_exc = None
-    for attempt in range(1, max_retries + 1):
-        try:
-            return llr_recon(
-                fft_ivim,
-                composite_sens,
-                basis,
-                use_basis=use_basis,
-                R=R,
-                lambda1=lambda1,
-                lambda2=lambda2,
-            )
-        except Exception as e:
-            last_exc = e
-            print(f"llr_recon attempt {attempt}/{max_retries} failed: {e}")
-            if attempt < max_retries:
-                time.sleep(delay_seconds)
-    raise last_exc
 
 # %% helper: plotting recon vs ivim with shared colors
 def plot_recon_vs_ivim(
@@ -539,17 +508,6 @@ def plot_recon_vs_ivim(
     plt.title(f"{recon_label} Reconstructed Signal vs. Ground Truth IVIM Signal")
     plt.legend(legend_entries)
 
-def plot_points_on_image(img, points, colors=None, title="Points on image"):
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.imshow(np.abs(img), cmap='gray')
-    if colors is None:
-        colors = plt.cm.tab10(np.linspace(0, 1, len(points)))
-    for (i, j), c in zip(points, colors):
-        plt.plot(j, i, marker='o', color=c, markersize=6)
-        plt.text(j + 2, i - 2, f"({i},{j})", color=c, fontsize=8)
-    plt.title(title)
-    plt.axis('off')
 
 # %%
 recon, recon_fmac2 = llr_recon_with_retry(
