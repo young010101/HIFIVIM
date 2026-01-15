@@ -213,11 +213,7 @@ plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
 # %%
 points = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
-plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
-plt.plot([p[1] for p in points], [p[0] for p in points], 'o')
-plt.title("Reconstructed Image with Demo Points", fontsize=14, fontweight='bold')
-plt.axis('off')
-plt.show()
+plot_points_on_image(abs(recon.squeeze()[:, :, 0]), points)
 # %%
 plt.figure(figsize=(15,3))
 for i, (x, y) in enumerate(points):
@@ -235,7 +231,7 @@ plt.show()
 demo_line = recon_fmac2.squeeze()[82,82,:]
 plt.plot(bvals, ivim[82,82,:] / ivim[82,82,0] * demo_line[0], 'o')
 plt.plot(bvals, np.real(demo_line), '-x')
-show_15_bvals(np.real(recon_fmac2.squeeze()) - ivim)
+show_15_bvals(np.real(recon_fmac2.squeeze())/ recon_fmac2.max() - ivim)
 # %%
 recon, recon_fmac3 = llr_recon(fft_ivim, composite_sens, basis3,
                                 use_basis=True, R=2, lambda1=0.001, lambda2=0.001)  # check different lambdas after

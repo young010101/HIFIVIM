@@ -324,13 +324,14 @@ def show_demo(x):
 
 show_demo(sens_prelim_fix)
 # %%
-def show_15_bvals(x, cmap='gray'):
+def show_15_bvals(x, cmap='gray', low_p = 1, high_p = 99):
     print(x.shape)
     fix, axes = plt.subplots(3, 5, figsize=(15, 9))
     axes_flat = axes.ravel()
     last_im = None
     for i, ax in enumerate(axes_flat):
-        last_im = ax.imshow(np.abs(x[:, :, i]), cmap=cmap)
+        vmin, vmax = np.percentile(np.abs(x[:, :, i]), [low_p, high_p])
+        last_im = ax.imshow(np.abs(x[:, :, i]), cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_title(f'b_val = {bvals[i]}')
         ax.axis('off')
     # Add a single shared colorbar for the grid
@@ -519,13 +520,16 @@ recon, recon_fmac2 = llr_recon_with_retry(
     lambda1=0.001,
     lambda2=0.001,
 )
+# %%
+mask_img = recon_fmac2.squeeze().real[:,:,0] > 2000
+plt.imshow(mask_img, cmap='gray')
 # %% save recon fmac2 to mat
 import scipy.io as sio
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_fmac2.mat'), {'recon_fmac2': recon_fmac2})
 # %% plot recon vs ivim using helper
 plot_recon_vs_ivim(recon_fmac2, dtd_gamma_bdelta_0, bvals, points, recon_label="2 basis", ivim_scale=1.0)
 # visualize points on the phantom image (use b0 ivim magnitude)
-plot_points_on_image(dtd_gamma_bdelta_0[:, :, 6], points, title="Selected points on phantom (b0)")
+plot_points_on_image(dtd_gamma_bdelta_0[:, :, 6] * mask_img, points, title="Selected points on phantom (b0)")
 plot_points_on_image(recon_fmac2.squeeze()[:, :, 6], points, title="Selected points on recon_fmac2 (b0)")
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -550,9 +554,9 @@ print_info(recon_fmac2.squeeze(), "recon_fmac2.squeeze()")
 plt.imshow(abs(recon.squeeze()[:, :, 0]), cmap='gray')
 show_15_bvals(np.real(recon_fmac2.squeeze()))
 # %% residual
-residual_fmac2_real = dtd_gamma_bdelta_0 - np.real(recon_fmac2.squeeze())
-residual_fmac2_abs = dtd_gamma_bdelta_0 - abs(recon_fmac2.squeeze())
-show_15_bvals(residual_fmac2_real, cmap='seismic')
+residual_fmac2_real = dtd_gamma_bdelta_0 * mask_img[:, :, np.newaxis] - np.real(recon_fmac2.squeeze())
+residual_fmac2_abs = dtd_gamma_bdelta_0 * mask_img[:, :, np.newaxis] - abs(recon_fmac2.squeeze())
+show_15_bvals(residual_fmac2_real, cmap='seismic', high_p=80)
 show_15_bvals(residual_fmac2_abs, cmap='seismic')
 show_15_bvals(residual_fmac2_real, cmap='coolwarm')
 show_15_bvals(residual_fmac2_abs, cmap='coolwarm')
@@ -610,6 +614,9 @@ recon_b_delta_1, recon_fmac3_b_delta_1 = llr_recon_with_retry(
     lambda2=0.001,
 )
 # %%
+residual_fmac2_bdelta1_real = dtd_gamma_bdelta_0 * mask_img[:, :, np.newaxis] - np.real(recon_fmac2_b_delta_1.squeeze())
+show_15_bvals(residual_fmac2_bdelta1_real, cmap='seismic', high_p=80)
+# %%
 recon_b_delta_1, recon_fmac4_b_delta_1 = llr_recon_with_retry(
     fft_ivim_b_delta_1_expand,
     composite_sens_b_delta_1,
@@ -644,11 +651,13 @@ sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_all.mat'), {
  
 try:
     save_nifti(np.real(recon_fmac2.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2.nii.gz'), affine=affine)
+    np.savetxt(os.path.join(outdir_nifti, 'recon_fmac2.bval'), bvals.reshape(1, len(bvals)), fmt='%d', delimiter=' ')
     save_nifti(np.real(recon_fmac3.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3.nii.gz'), affine=affine)
     save_nifti(np.real(recon_fmac4.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac4.nii.gz'), affine=affine)
     save_nifti(np.real(recon_fmac5.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac5.nii.gz'), affine=affine)
 
     save_nifti(np.real(recon_fmac2_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac2_b_delta_1.nii.gz'), affine=affine)
+    np.savetxt(os.path.join(outdir_nifti, 'recon_fmac2_b_delta_1.bval'), bvals.reshape(1, len(bvals)), fmt='%d', delimiter=' ')
     save_nifti(np.real(recon_fmac3_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac3_b_delta_1.nii.gz'), affine=affine)
     save_nifti(np.real(recon_fmac4_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac4_b_delta_1.nii.gz'), affine=affine)
     save_nifti(np.real(recon_fmac5_b_delta_1.squeeze()[:,:,np.newaxis,:]), os.path.join(outdir_nifti, 'recon_fmac5_b_delta_1.nii.gz'), affine=affine)
