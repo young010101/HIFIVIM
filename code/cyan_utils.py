@@ -5,6 +5,59 @@ from scipy.optimize import least_squares
 from scipy.special import erf
 
 
+@DeprecationWarning
+def make_toy_sens_2d(nx=128, ny=128, ncoils=32, ring_radius=0.8, eps=1e-3,
+                    phase_alpha=2.0,  # 0.0 -> purely real (no extra phase)
+                    amp_model="inv_r",  # "inv_r" or "gauss"
+                    sigma=0.35,         # used if amp_model="gauss"
+                    normalize_sos=True,
+                    dtype=np.complex64):
+    """
+    Returns sens maps with shape (nx, ny, ncoils) complex.
+    Coordinates are normalized to [-1,1].
+    """
+    x = np.linspace(-1, 1, nx, dtype=np.float32)
+    y = np.linspace(-1, 1, ny, dtype=np.float32)
+    X, Y = np.meshgrid(x, y, indexing="ij")  # shape (nx, ny)
+
+    sens = np.zeros((nx, ny, ncoils), dtype=np.complex64)
+
+    for k in range(ncoils):
+        theta = 2.0 * np.pi * k / ncoils
+        xk = ring_radius * np.cos(theta)
+        yk = ring_radius * np.sin(theta)
+
+        dx = X - xk
+        dy = Y - yk
+
+        if amp_model == "inv_r":
+            A = 1.0 / np.sqrt(dx * dx + dy * dy + eps)
+        elif amp_model == "gauss":
+            A = np.exp(-(dx * dx + dy * dy) / (2.0 * sigma * sigma))
+        else:
+            raise ValueError("amp_model must be 'inv_r' or 'gauss'")
+
+        # smooth coil-dependent phase (optional)
+        phi = phase_alpha * (X * np.cos(theta) + Y * np.sin(theta))
+        sens[..., k] = A * np.exp(1j * phi)
+
+    if normalize_sos:
+        sos = np.sqrt(np.sum(np.abs(sens) ** 2, axis=-1, keepdims=True) + 1e-12)
+        sens = sens / sos
+
+    return sens.astype(dtype)
+
+
+def bartize_sens(sens_xyc: np.ndarray):
+    """
+    Convert (nx, ny, coils) -> BART-friendly dims.
+    BART convention often uses [X Y Z COIL ...] with COIL at dim=3 (0-based).
+    Here we output shape (nx, ny, 1, ncoils) so coil dim is the 4th dimension.
+    """
+    nx, ny, nc = sens_xyc.shape
+    return sens_xyc.reshape(nx, ny, 1, nc)
+
+
 def ifft2c(x):
     return np.fft.ifftshift(np.fft.ifft2(np.fft.fftshift(x), axes=(0,1),norm=None))
 
