@@ -5,7 +5,29 @@ from typing import Optional, Dict, Any
 from scipy.optimize import least_squares
 from scipy.special import erf
 from utils import dtd_gamma_model, BVALS
+from matplotlib.pyplot import plt
 
+
+def show_15_bvals(x, cmap='gray', low_p = 1, high_p = 99, bvals=BVALS):
+    print(x.shape)
+    fix, axes = plt.subplots(3, 5, figsize=(15, 9))
+    axes_flat = axes.ravel()
+    last_im = None
+    for i, ax in enumerate(axes_flat):
+        vmin, vmax = np.percentile(np.abs(x[:, :, i]), [low_p, high_p])
+        last_im = ax.imshow(np.abs(x[:, :, i]), cmap=cmap, vmin=vmin, vmax=vmax)
+        if bvals is not None:
+            ax.set_title(f'b_val = {bvals[i]}')
+        ax.axis('off')
+    # Add a single shared colorbar for the grid
+    if last_im is not None:
+        cax = fix.add_axes([axes[-1, -1].get_position().x1 + 0.1,
+                           axes[-1, -1].get_position().y0,
+                           0.01,
+                           axes[0, -1].get_position().y1 - axes[-1, -1].get_position().y0])
+        fix.colorbar(last_im, cax=cax)
+    plt.tight_layout()
+    plt.show()
 
 
 def make_phantom(args, show=True, slice=90, points=None, bvals=BVALS):

@@ -13,7 +13,7 @@ from Phantom_utils import add_phase, add_sens_maps, \
     bland_altman_image
 from utils import add_noise, lowres_phaseremoval, \
     get_composite_sens, ivim_fit_segmented, median_otsu, llr_recon_with_retry, BVALS
-from cyan_utils import plot_points_on_image, make_phantom
+from cyan_utils import plot_points_on_image, make_phantom, show_15_bvals
 
 
 def parser(argv=None):
@@ -185,25 +185,6 @@ def show_demo(x):
 
 show_demo(sens_prelim_fix)
 # %%
-def show_15_bvals(x, cmap='gray', low_p = 1, high_p = 99):
-    print(x.shape)
-    fix, axes = plt.subplots(3, 5, figsize=(15, 9))
-    axes_flat = axes.ravel()
-    last_im = None
-    for i, ax in enumerate(axes_flat):
-        vmin, vmax = np.percentile(np.abs(x[:, :, i]), [low_p, high_p])
-        last_im = ax.imshow(np.abs(x[:, :, i]), cmap=cmap, vmin=vmin, vmax=vmax)
-        ax.set_title(f'b_val = {bvals[i]}')
-        ax.axis('off')
-    # Add a single shared colorbar for the grid
-    if last_im is not None:
-        cax = fix.add_axes([axes[-1, -1].get_position().x1 + 0.1,
-                           axes[-1, -1].get_position().y0,
-                           0.01,
-                           axes[0, -1].get_position().y1 - axes[-1, -1].get_position().y0])
-        fix.colorbar(last_im, cax=cax)
-    plt.tight_layout()
-    plt.show()
 show_15_bvals(sens_prelim_fix)
 # %%
 show_15_bvals(sens_prelim_b_delta_1_fix)
