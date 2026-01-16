@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 import cfl
 import nibabel as nib    
 from bart import bart
-from Phantom_utils import add_phase, add_sens_maps, get_fft, \
+from Phantom_utils import add_phase, add_sens_maps, \
     bland_altman_image
 from utils import dtd_gamma_model, add_noise, get_initial_sens, lowres_phaseremoval, \
     get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu, llr_recon_with_retry
@@ -24,7 +24,7 @@ def parser(argv=None):
     return parse.parse_args(argv)
 
     
-def get_fft(args, composite_ivim_sens, show=True):
+def undersample_fft(args, composite_ivim_sens, show=True):
 
     fft_ivim = bart(1, 'fft -u 3', composite_ivim_sens)
     fft_ivim[:, ::2] = 0 # undersample R=2
@@ -73,13 +73,13 @@ else:
     os.mkdir(args.outdir)
     print(f"Created directory {args.outdir}")
 
-# bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
-# bvals = np.asarray([0, 7, 10, 15, 20, 40, 50, 60, 100, 200, 400, 700, 1000, 1400, 2000])  # s/mm^2
-bvals = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
+BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
+POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
+bvals = BVALS
 
 
 # %% make phantom
-def make_phantom(args, show=True, slice = 90):
+def make_phantom(args, show=True, slice=90, points=None):
     import nibabel as nib
     import matplotlib.pyplot as plt
 
@@ -205,27 +205,30 @@ def make_phantom(args, show=True, slice = 90):
         plt.show()
 
         # ########### select some point to plot signal curve ########################
-        fig, axes = plt.subplots(1, len(points), figsize=(15,3))
-        for idx, (i,j) in enumerate(points):
-            ax = axes[idx]
-            ax.plot(bvals, phantom_data[i,j], 'o-')
-            ax.plot(bvals, phantom_data_b_delta_1[i,j], 'x--')
-            ax.set_xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
-            if idx == 0:
-                ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
-            ax.set_title('({},{})'.format(i,j), fontsize=14, fontweight='bold')
-            ax.grid()
+        if points:
+            fig, axes = plt.subplots(1, len(points), figsize=(15,3))
+            for idx, (i, j) in enumerate(points):
+                ax = axes[idx]
+                ax.plot(bvals, phantom_data[i, j], 'o-')
+                ax.plot(bvals, phantom_data_b_delta_1[i, j], 'x--')
+                ax.set_xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
+                if idx == 0:
+                    ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
+                ax.set_title('({},{})'.format(i, j), fontsize=14, fontweight='bold')
+                ax.grid()
         
 
     return md, vi, va, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
                                       np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
 
 
-mean_diff, var_iso, var_aniso, dtd_gamma_bdelta_0, dtd_gamma_bdelta_1, masks = make_phantom(args, show=True)  # 164 x 164 x 15 for ivim
+mean_diff, var_iso, var_aniso, dtd_gamma_bdelta_0, dtd_gamma_bdelta_1, masks = make_phantom(
+    args, show=True, points=POINTS
+)  # 164 x 164 x 15 for ivim
 dtd_gamma_bdelta_0 = dtd_gamma_bdelta_0 * 1000  # scale to typical signal levels
 dtd_gamma_bdelta_1 = dtd_gamma_bdelta_1 * 1000 
 # %%
-points = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
+points = POINTS
 plt.figure(figsize=(15,3))
 for idx, (i, j) in enumerate(points):
     ax = plt.subplot(1, len(points), idx + 1)
@@ -293,8 +296,8 @@ sens_maps_expand = np.expand_dims(sens_maps, axis=2)
 composite_ivim_sens_b_delta_1, sens_maps_b_delta_1 = add_sens_maps(args, composite_ivim_b_delta_1, show=True)
 sens_maps_b_delta_1_expand = np.expand_dims(sens_maps_b_delta_1, axis=2)
 # %%
-fft_bdelta_0 = np.expand_dims(get_fft(args, composite_ivim_sens, show=True), axis=2)  # 164x164x1x16x15
-fft_bdelta_1 = np.expand_dims(get_fft(args, composite_ivim_sens_b_delta_1, show=True), axis=2)
+fft_bdelta_0 = np.expand_dims(undersample_fft(args, composite_ivim_sens, show=True), axis=2)  # 164x164x1x16x15
+fft_bdelta_1 = np.expand_dims(undersample_fft(args, composite_ivim_sens_b_delta_1, show=True), axis=2)
 # %%
 x_dim = fft_bdelta_0.shape[0]
 y_dim = fft_bdelta_0.shape[1]
