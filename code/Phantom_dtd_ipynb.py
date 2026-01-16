@@ -11,10 +11,9 @@ import nibabel as nib
 from bart import bart
 from Phantom_utils import add_phase, add_sens_maps, \
     bland_altman_image
-from utils import dtd_gamma_model, add_noise, get_initial_sens, lowres_phaseremoval, \
-    get_composite_sens, ivim_fit_segmented, llr_recon, median_otsu, llr_recon_with_retry
-from cyan_utils import plot_points_on_image
-# from utils import dtd_gamma_model as ivim_model
+from utils import add_noise, lowres_phaseremoval, \
+    get_composite_sens, ivim_fit_segmented, median_otsu, llr_recon_with_retry, BVALS
+from cyan_utils import plot_points_on_image, make_phantom
 
 
 def parser(argv=None):
@@ -75,154 +74,11 @@ outdir_nifti = os.path.join(args.outdir, 'phan_cyan/DATA/brain/NII')
 ensure_dir(args.outdir)
 ensure_dir(outdir_nifti)
 
-BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 bvals = BVALS
 
 
 # %% make phantom
-def make_phantom(args, show=True, slice=90, points=None):
-    import nibabel as nib
-    import matplotlib.pyplot as plt
-
-    phantom = nib.load(os.path.join(args.outdir, 'Phantom_T1.nii.gz')).get_fdata()[..., slice]
-    phantom[phantom < 200] = 0
-    phantom = phantom / phantom.max() * 4.  # scale to 0-3.
-
-    md, vi, va = np.zeros_like(phantom), np.zeros_like(phantom), np.zeros_like(phantom)
-    phantom_data = np.zeros((phantom.shape[0], phantom.shape[1], bvals.shape[0]))
-    phantom_data_b_delta_1 = np.zeros_like(phantom_data)
-    WMmask, GMmask, CSFmask, WMH_mask1,WMH_mask2, BGmask = np.zeros_like(md), np.zeros_like(md), \
-                                              np.zeros_like(md), np.zeros_like(md), np.zeros_like(md), np.zeros_like(md)
-
-    center = (45,100)
-    height, width = phantom.shape
-
-    WMH_mask1 = np.zeros_like(md)
-    y, x = np.ogrid[:height, :width]
-    radius = 5
-    WMH_mask1[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
-
-    WMH_mask2 = np.zeros_like(md)
-    center, radius = (53,60), 3.5
-    WMH_mask2[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
-
-    WMH_mask3 = np.zeros_like(md)
-    center, radius = (60,100), 3
-    WMH_mask3[(x - center[0]) ** 2 + (y - center[1]) ** 2 <= radius ** 2] = 1
-
-
-    for i in range(phantom.shape[0]):
-        for j in range(phantom.shape[1]):
-            if WMH_mask1[i,j] == 1:
-                # md is stored in μm²/ms units; here md = 1.2 (≈ 0.0012 mm²/s)
-                md[i, j] = 1.2
-                vi[i, j] = 0.96
-                va[i, j] = 0.925
-            elif WMH_mask2[i, j] == 1:
-                md[i, j] = 1.4
-                vi[i, j] = 0.97
-                va[i, j] = 0.928
-            elif WMH_mask3[i, j] == 1:
-                md[i, j] = 1.3
-                vi[i, j] = 0.965
-                va[i, j] = 0.927
-            else:
-                if j < 101 and j > 65 and i > 62 and i < 103:
-                    md[i, j] = 0.6 if phantom[i, j] > 2.5 else 0.5 if phantom[i, j] > 1.7 else 3 if phantom[
-                                                                                                                  i, j] > 0 else 0
-                    vi[i, j] = 0.7 if phantom[i, j] > 2.5 else 0.6 if phantom[i, j] > 1.7 else 2.5 if phantom[
-                                                                                                            i, j] > 0 else 0
-                    va[i, j] = 0.45 if phantom[i, j] > 2.5 else 0.55 if phantom[i, j] > 1.7 else 0.2 if phantom[ i, j] > 0 else 0
-                else:
-                    md[i, j] = 0.6 if phantom[i, j] > 2.35 else 0.9 if phantom[i, j] > 1.7 else 3 if phantom[
-                                                                                                                  i, j] > 0 else 0
-                    vi[i, j] = 0.7 if phantom[i, j] > 2.35 else 1.4 if phantom[i, j] > 1.7 else 2 if phantom[
-                                                                                                            i, j] > 0 else 0
-                    va[i, j] = 0.45 if phantom[i, j] > 2.35 else 0.3 if phantom[i, j] > 1.7 else 0.2 if phantom[
-                                                                                                              i, j] > 0 else 0
-            if np.isclose(md[i,j], 0.6):
-                WMmask[i,j] = 1
-            elif np.isclose(md[i, j], 0.5):
-                BGmask[i, j] = 1
-            elif np.isclose(md[i, j], 0.9):
-                GMmask[i, j] = 1
-            elif np.isclose(md[i, j], 3):
-                CSFmask[i, j] = 1
-
-
-            phantom_data[i,j] = dtd_gamma_model(10, md[i,j], vi[i,j], va[i,j], bvals)
-            phantom_data[i,j][md[i,j] == 0] =0
-            phantom_data_b_delta_1[i,j] = dtd_gamma_model(10, md[i,j], vi[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
-            phantom_data_b_delta_1[i,j][md[i,j] == 0] =0
-
-
-    if show:
-        plt.figure()
-        plt.subplot(231), plt.imshow(np.rot90(WMmask), cmap='gray'), plt.axis('off')
-        plt.subplot(232),  plt.imshow(np.rot90(GMmask), cmap='gray'), plt.axis('off')
-        plt.subplot(233), plt.imshow(np.rot90(BGmask), cmap='gray'), plt.axis('off')
-        plt.subplot(234), plt.imshow(np.rot90(WMH_mask1), cmap='gray'), plt.axis('off')
-        plt.subplot(235), plt.imshow(np.rot90(WMH_mask2), cmap='gray'), plt.axis('off')
-        plt.subplot(236), plt.imshow(np.rot90(WMH_mask3), cmap='gray'), plt.axis('off')
-
-        cmap = 'turbo'
-        fig, axes = plt.subplots(1, 4, figsize=(16,4))
-        axes[0].imshow(np.rot90(phantom), cmap='gray'), axes[0].set_xticks([]), axes[0].set_yticks([])
-        axes[0].set_title('Phantom', fontsize=16, fontweight='bold')
-        plt.colorbar(axes[0].images[0], ax=axes[0], fraction=0.046, pad=0.04)
-
-        im = axes[1].imshow(np.rot90(md), cmap=cmap)
-        axes[1].set_xticks([]), axes[1].set_yticks([])
-        axes[1].set_title('MD', fontsize=16, fontweight='bold'), im.set_clim(0.3, 1.5)
-        cax = fig.add_axes([axes[1].get_position().x1 + 0.005,
-                            axes[1].get_position().y0, 0.01, axes[1].get_position().height])
-        cbar = plt.colorbar(axes[1].images[0], cax=cax)
-
-
-        im = axes[2].imshow(np.rot90(vi), cmap=cmap)
-        axes[2].set_xticks([]), axes[2].set_yticks([])
-        axes[2].set_title('$V_I$', fontsize=16, fontweight='bold'), im.set_clim()
-        cax = fig.add_axes([axes[2].get_position().x1 + 0.005,
-                            axes[2].get_position().y0, 0.01, axes[2].get_position().height])
-        cbar = plt.colorbar(axes[2].images[0], cax=cax)
-
-        im = axes[3].imshow(np.rot90(va), cmap=cmap)
-        axes[3].set_xticks([]), axes[3].set_yticks([])
-        axes[3].set_title('$V_A$', fontsize=16, fontweight='bold'), im.set_clim()
-        cax = fig.add_axes([axes[3].get_position().x1 + 0.005,
-                            axes[3].get_position().y0, 0.01, axes[3].get_position().height])
-        cbar = plt.colorbar(axes[3].images[0], cax=cax)
-
-        plt.subplots_adjust(wspace=0.5)
-
-        # ####################################################
-        plt.figure(figsize=(15,3))
-        for i in range(5):
-            plt.subplot(1,5,i+1)
-            plt.imshow(np.rot90(phantom_data[...,(i+3)*2]), cmap='gray'), plt.clim(), plt.axis('off')
-            plt.title("b = {} s/mm$^2$".format(bvals[(i+3)*2]), fontsize=14, fontweight='bold')
-            plt.colorbar()
-
-        plt.show()
-
-        # ########### select some point to plot signal curve ########################
-        if points:
-            fig, axes = plt.subplots(1, len(points), figsize=(15,3))
-            for idx, (i, j) in enumerate(points):
-                ax = axes[idx]
-                ax.plot(bvals, phantom_data[i, j], 'o-')
-                ax.plot(bvals, phantom_data_b_delta_1[i, j], 'x--')
-                ax.set_xlabel('b-values (s/mm$^2$)', fontsize=14, fontweight='bold')
-                if idx == 0:
-                    ax.set_ylabel('Signal Intensity', fontsize=14, fontweight='bold')
-                ax.set_title('({},{})'.format(i, j), fontsize=14, fontweight='bold')
-                ax.grid()
-        
-
-    return md, vi, va, phantom_data, phantom_data_b_delta_1, (np.rot90(WMmask), np.rot90(GMmask), np.rot90(CSFmask),
-                                      np.rot90(BGmask), np.rot90(WMH_mask1), np.rot90(WMH_mask2), np.rot90(WMH_mask3))
-
 
 mean_diff, var_iso, var_aniso, dtd_gamma_bdelta_0, dtd_gamma_bdelta_1, masks = make_phantom(
     args, show=True, points=POINTS

@@ -53,6 +53,8 @@ Functions for model-based IVIM/IVIM-LLR
 
 # TODO: add documentation and commenting for everything.
 
+BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
+
 
 def ivim_model(f: float, D: float, Dstar: float, bvals):
     """
