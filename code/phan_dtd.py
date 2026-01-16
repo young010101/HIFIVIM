@@ -1,6 +1,6 @@
 # %% import region
 from types import SimpleNamespace
-from Phantom_dtd_ipynb import make_phantom
+from cyan_utils import make_phantom
 
 
 # %% global parameters
