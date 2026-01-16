@@ -61,17 +61,19 @@ def save_nifti(volume, out_path, dtype=np.float32, affine=None):
     img = nib.Nifti1Image(vol, affine)
     nib.save(img, out_path)
 
+def ensure_dir(path):
+    if path and not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+        print(f"Created directory {path}")
+
 outdir_nifti = os.path.join(args.outdir, 'phan_cyan/DATA/brain/NII')
 
 
 # args.__dict__
 # args = SimpleNamespace(phantom_dir='phantom_1.0mm_normal_fuzzy', outdir='/tmp/out')
 # %%
-if os.path.exists(args.outdir):
-    pass
-else:
-    os.mkdir(args.outdir)
-    print(f"Created directory {args.outdir}")
+ensure_dir(args.outdir)
+ensure_dir(outdir_nifti)
 
 BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
@@ -512,6 +514,18 @@ def plot_recon_vs_ivim(
     plt.title(f"{recon_label} Reconstructed Signal vs. Ground Truth IVIM Signal")
     plt.legend(legend_entries)
 
+def run_recon_for_bases(fft_data, composite_sens, bases_dict, basis_numbers, **kwargs):
+    recon_last = None
+    recon_fmac = {}
+    for n in basis_numbers:
+        recon_last, recon_fmac_n = llr_recon_with_retry(
+            fft_data,
+            composite_sens,
+            bases_dict[n],
+            **kwargs,
+        )
+        recon_fmac[n] = recon_fmac_n
+    return recon_last, recon_fmac
 
 # %%
 recon, recon_fmac2 = llr_recon_with_retry(
@@ -566,78 +580,40 @@ show_15_bvals(residual_fmac2_abs, cmap='coolwarm')
 show_15_bvals(residual_fmac2_real[30:120, 30:120, :], cmap='seismic')
 show_15_bvals(residual_fmac2_real[30:120, 30:120, :], cmap='coolwarm')
 # %%
-recon, recon_fmac3 = llr_recon_with_retry(
+recon, recon_fmac_by_basis = run_recon_for_bases(
     fft_bdelta_0,
     composite_sens,
-    basis3,
+    bases,
+    [3, 4, 5],
     use_basis=True,
     R=2,
     lambda1=0.001,
     lambda2=0.001,
 )
+recon_fmac3 = recon_fmac_by_basis[3]
+recon_fmac4 = recon_fmac_by_basis[4]
+recon_fmac5 = recon_fmac_by_basis[5]
 #%%
 plot_recon_vs_ivim(recon_fmac3, dtd_gamma_bdelta_0, bvals, points, recon_label="3 basis", ivim_scale=1.0)
 # %%
-recon, recon_fmac4 = llr_recon_with_retry(
-    fft_bdelta_0,
-    composite_sens,
-    basis4,
-    use_basis=True,
-    R=2,
-    lambda1=0.001,
-    lambda2=0.001,
-)
-
-recon, recon_fmac5 = llr_recon_with_retry(
-    fft_bdelta_0,
-    composite_sens,
-    basis5,
-    use_basis=True,
-    R=2,
-    lambda1=0.001,
-    lambda2=0.001,
-)
-# %%
-recon_b_delta_1, recon_fmac2_b_delta_1 = llr_recon_with_retry(
+recon_b_delta_1, recon_fmac_b_delta_1 = run_recon_for_bases(
     fft_ivim_b_delta_1_expand,
     composite_sens_b_delta_1,
-    bases_dtd_bdelta1[2],
+    bases_dtd_bdelta1,
+    [2, 3, 4, 5],
     use_basis=True,
     R=2,
     lambda1=0.001,
     lambda2=0.001,
 )
-recon_b_delta_1, recon_fmac3_b_delta_1 = llr_recon_with_retry(
-    fft_ivim_b_delta_1_expand,
-    composite_sens_b_delta_1,
-    bases_dtd_bdelta1[3],
-    use_basis=True,
-    R=2,
-    lambda1=0.001,
-    lambda2=0.001,
-)
+recon_fmac2_b_delta_1 = recon_fmac_b_delta_1[2]
+recon_fmac3_b_delta_1 = recon_fmac_b_delta_1[3]
+recon_fmac4_b_delta_1 = recon_fmac_b_delta_1[4]
+recon_fmac5_b_delta_1 = recon_fmac_b_delta_1[5]
 # %%
 residual_fmac2_bdelta1_real = dtd_gamma_bdelta_0 * mask_img[:, :, np.newaxis] - np.real(recon_fmac2_b_delta_1.squeeze())
 show_15_bvals(residual_fmac2_bdelta1_real, cmap='seismic', high_p=80)
 # %%
-recon_b_delta_1, recon_fmac4_b_delta_1 = llr_recon_with_retry(
-    fft_ivim_b_delta_1_expand,
-    composite_sens_b_delta_1,
-    bases_dtd_bdelta1[4],
-    use_basis=True,
-    R=2,
-    lambda1=0.001,
-    lambda2=0.001,
-)
-recon_b_delta_1, recon_fmac5_b_delta_1 = llr_recon_with_retry(
-    fft_ivim_b_delta_1_expand,
-    composite_sens_b_delta_1,
-    bases_dtd_bdelta1[5],
-    use_basis=True,
-    R=2,
-    lambda1=0.001,
-    lambda2=0.001,
-)
 # %%
 sio.savemat(os.path.join(args.outdir + '/phan_cyan', 'recon_all.mat'), {
     'recon': recon,   
@@ -698,53 +674,24 @@ filtered5 = recon_fmac5
 filtered_sens = abs(sense_prelim)
 filtered_sens_real = np.real(phase_removal)
 
+def run_ivim_fit_segmented(volume, mask, pool):
+    x_dim, y_dim = volume.shape[0], volume.shape[1]
+    args2 = [(volume[i, j] / volume[i, j, 0], mask[i, j]) for i in range(x_dim) for j in range(y_dim)]
+    results = pool.starmap(ivim_fit_segmented, args2)
+    results = np.rot90(np.asarray(results).reshape((x_dim, y_dim, 3)))
+    return results[..., 0], results[..., 1], results[..., 2]
+
 _, mask = median_otsu(np.abs(recon_fmac2.squeeze()[..., 0]), median_radius=6, numpass=2)
 mask = mask.astype(np.uint8)
 start = datetime.datetime.now()
 
 with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-    tmp = filtered
-    args2 = [(tmp[i, j] / tmp[i, j, 0], mask[i, j]) for i in range(tmp.shape[0])
-                for j in range(tmp.shape[1])]
-    results = pool.starmap(ivim_fit_segmented, args2)
-
-    results = np.rot90(np.asarray(results).reshape((164, 164, 3)))
-    Dtsub2, Dpsub2, Fpsub2 = results[..., 0], results[..., 1], results[..., 2]
-
-    tmp = filtered3
-    args2 = [(tmp[i, j] / tmp[i, j, 0], mask[i, j]) for i in range(tmp.shape[0])
-                for j in range(tmp.shape[1])]
-    results = pool.starmap(ivim_fit_segmented, args2)
-    results = np.rot90(np.asarray(results).reshape((164, 164, 3)))
-    Dtsub3, Dpsub3, Fpsub3 = results[..., 0], results[..., 1], results[..., 2]
-
-    tmp = filtered4
-    args2 = [(tmp[i, j] / tmp[i, j, 0], mask[i, j]) for i in range(tmp.shape[0])
-                for j in range(tmp.shape[1])]
-    results = pool.starmap(ivim_fit_segmented, args2)
-    results = np.rot90(np.asarray(results).reshape((164, 164, 3)))
-    Dtsub4, Dpsub4, Fpsub4 = results[..., 0], results[..., 1], results[..., 2]
-
-    tmp = filtered5
-    args2 = [(tmp[i, j] / tmp[i, j, 0], mask[i, j]) for i in range(tmp.shape[0])
-                for j in range(tmp.shape[1])]
-    results = pool.starmap(ivim_fit_segmented, args2)
-    results = np.rot90(np.asarray(results).reshape((164, 164, 3)))
-    Dtsub5, Dpsub5, Fpsub5 = results[..., 0], results[..., 1], results[..., 2]
-
-    tmp = filtered_sens
-    args2 = [(tmp[i, j] / tmp[i, j, 0], mask[i, j]) for i in range(tmp.shape[0])
-                for j in range(tmp.shape[1])]
-    results = pool.starmap(ivim_fit_segmented, args2)
-    results = np.rot90(np.asarray(results).reshape((164, 164, 3)))
-    Dtsens, Dpsens, Fpsens = results[..., 0], results[..., 1], results[..., 2]
-
-    tmp = filtered_sens_real
-    args2 = [(tmp[i, j] / tmp[i, j, 0], mask[i, j]) for i in range(tmp.shape[0])
-                for j in range(tmp.shape[1])]
-    results = pool.starmap(ivim_fit_segmented, args2)
-    results = np.rot90(np.asarray(results).reshape((164, 164, 3)))
-    Dtlowres, Dplowres, Fplowres = results[..., 0], results[..., 1], results[..., 2]
+    Dtsub2, Dpsub2, Fpsub2 = run_ivim_fit_segmented(filtered, mask, pool)
+    Dtsub3, Dpsub3, Fpsub3 = run_ivim_fit_segmented(filtered3, mask, pool)
+    Dtsub4, Dpsub4, Fpsub4 = run_ivim_fit_segmented(filtered4, mask, pool)
+    Dtsub5, Dpsub5, Fpsub5 = run_ivim_fit_segmented(filtered5, mask, pool)
+    Dtsens, Dpsens, Fpsens = run_ivim_fit_segmented(filtered_sens, mask, pool)
+    Dtlowres, Dplowres, Fplowres = run_ivim_fit_segmented(filtered_sens_real, mask, pool)
 
 print(datetime.datetime.now() - start)
 CSFmask = np.rot90(mean_diff.copy())
