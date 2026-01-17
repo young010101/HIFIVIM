@@ -2,7 +2,7 @@ from bart import bart
 import sigpy as sp
 import numpy as np
 import sigpy.mri as mr
-import matplotlib.pyplot as plt
+from utils import show_imgs
 
 img_shape = [256, 256]
 num_coils = 8
@@ -63,26 +63,6 @@ def test_espirit_calib():
         show_imgs(abs(mps_estimated_bart))
     # err = rel_l2(mps_estimated, mps_estimated_bart)
     # assert err < 1e-6, f"ESPIRiT Calib mismatch: rel_err={err}"
-
-
-def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10)):
-    imgs = np.asarray(imgs)
-    N = imgs.shape[0]
-    if ncols is None:
-        ncols = int(np.ceil(np.sqrt(N)))
-    nrows = int(np.ceil(N / ncols))
-
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
-    axes = np.atleast_1d(axes).ravel()
-
-    for i, ax in enumerate(axes):
-        if i < N:
-            ax.imshow(imgs[i], cmap=cmap)
-            if titles:
-                ax.set_title(titles[i])
-        ax.axis('off')
-    plt.tight_layout()
-    plt.show()
 
 
 def to_xycm(mps, Nx, Ny, Nc):

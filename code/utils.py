@@ -56,6 +56,26 @@ Functions for model-based IVIM/IVIM-LLR
 BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 
 
+def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10)):
+    imgs = np.asarray(imgs)
+    N = imgs.shape[0]
+    if ncols is None:
+        ncols = int(np.ceil(np.sqrt(N)))
+    nrows = int(np.ceil(N / ncols))
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    axes = np.atleast_1d(axes).ravel()
+
+    for i, ax in enumerate(axes):
+        if i < N:
+            ax.imshow(imgs[i], cmap=cmap)
+            if titles:
+                ax.set_title(titles[i])
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
 def ivim_model(f: float, D: float, Dstar: float, bvals):
     """
     :param f: perfusion fraction
