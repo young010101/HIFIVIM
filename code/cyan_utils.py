@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from scipy.optimize import least_squares
 from scipy.special import erf
 from utils import dtd_gamma_model, BVALS
-from matplotlib.pyplot import plt
+import matplotlib.pyplot as plt
 
 
 def show_15_bvals(x, cmap='gray', low_p = 1, high_p = 99, bvals=BVALS):
