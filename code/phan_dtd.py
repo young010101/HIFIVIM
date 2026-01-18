@@ -12,10 +12,19 @@ from bart import bart
 import utils
 import dict_gen_dtd
 import plot_utils
+import nibabel as nib
+import os
+import Phantom_utils
 
 # %% global parameters
 args = SimpleNamespace()
 args.outdir = '../Phantom/'
+ps = SimpleNamespace() 
+ps.bp = '../Phantom/phan_cyan'  # <- base path
+ps.ip = os.path.join(ps.bp, 'DATA', 'phan_brain', 'NII')  # <- actual input data
+ps.op = os.path.join(ps.bp, 'processed', 'phan_brain')  # <- store output here
+ps.zp = os.path.join(ps.bp, 'tmp')  # <- store temporary files here
+
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 num_bvals = len(BVALS)
 
@@ -44,6 +53,33 @@ def simulate_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
     return ksp, mps_cxy
 
 
+def help_show_imgs(imgs, cmap='gray'):
+    utils.show_imgs(np.abs(imgs.transpose(2,0,1)), cmap=cmap)
+
+
+def save_nifti(img_data, ps, filename=None, ref_path=None, debug=False) -> None:
+    out_path=ps.op
+    # affine = nib.load(ref_path).affine
+    ref_path = os.path.join(args.outdir, 'Phantom_T1.nii.gz') if ref_path is None else ref_path
+    
+    affine = nib.load(ref_path).affine 
+    img = nib.Nifti1Image(img_data, affine)
+
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+
+    nib.save(img, os.path.join(out_path, f'{filename}.nii.gz'))
+    # save bvals
+    np.savetxt(os.path.join(out_path, f'{filename}.bval'), BVALS.reshape(1, len(BVALS)), fmt='%d', delimiter=' ')
+    # save unit bvecs
+    bvecs = np.zeros((3, len(BVALS)))
+    bvecs[0, :] = 1  # x direction
+    np.savetxt(os.path.join(out_path, f'{filename}.bvec'), bvecs, fmt='%d', delimiter=' ')
+
+    if debug:
+        print(os.listdir(out_path))
+
+
 # %% generate phantom
 mean_diff, var_iso, var_aniso, _dtd_gamma_bdelta_0, _dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)
 dtd_gamma_bdelta_0 = np.rot90(_dtd_gamma_bdelta_0, k=1)
@@ -51,6 +87,10 @@ x_dim = _dtd_gamma_bdelta_0.shape[0]
 y_dim = _dtd_gamma_bdelta_0.shape[1]
 if False:
     cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
+
+if False:
+    composite_ivim = Phantom_utils.add_phase(args, dtd_gamma_bdelta_0,
+                            show=True)  # 164 x 164 x 15 - but now with different phase for each b-value.
 
 ksp_bdelta_0, mps_true = simulate_coil_ksp(dtd_gamma_bdelta_0)
 fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:,:,None,:,:] # Nx, Ny, 1, coils, bvals
@@ -90,20 +130,26 @@ basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
 print('Basis shape:', basis.shape)  # Nb, num_basis
 # %%
 fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)  # Nx, Ny, 1, coils, 1, bvals
+basis2 = basis[..., :2]  # Nb, 2
 recon, recon_fmac_basis = utils.llr_recon_with_retry(
     fft_bdelta_0_expand,
     composite_sens,
-    basis[:, :2],
+    basis2,
     use_basis=True,
     lambda1=0.001,
     lambda2=0.001,
 )
+print(f"coeff shape: {recon.shape}, basis shape: {basis2.shape}")  # Nx, Ny, 1, 1, 1, 1, num_coeff
 print(f'Reconstructed FMAC basis shape: {recon_fmac_basis.shape}, max {np.max(np.abs(recon_fmac_basis))}')  # Nx, Ny, 1, 1, 1, num_basis
 print(f'{dtd_gamma_bdelta_0.shape}')
-utils.show_imgs(np.abs(recon_fmac_basis.squeeze().transpose(2,0,1)))
-utils.show_imgs(np.abs(dtd_gamma_bdelta_0.transpose(2,0,1)))
-utils.show_imgs((np.abs(recon_fmac_basis.squeeze()) - np.abs(dtd_gamma_bdelta_0)).transpose(2,0,1))
+
+help_show_imgs(recon_fmac_basis.squeeze())
+help_show_imgs(dtd_gamma_bdelta_0)
+help_show_imgs(np.abs(recon_fmac_basis.squeeze()) - np.abs(dtd_gamma_bdelta_0), cmap='bwr')
+help_show_imgs(recon_fmac_basis.squeeze() - dtd_gamma_bdelta_0)
+print('MSE:', np.mean((np.abs(recon_fmac_basis.squeeze()) - dtd_gamma_bdelta_0)**2))
 plot_utils.plot_recon_vs_ivim(recon_fmac_basis, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
 
 
 # %%
+save_nifti(recon_fmac_basis.squeeze(), ps=ps, filename='phan_dtd_recon_2basis', ref_path=None, debug=True)
