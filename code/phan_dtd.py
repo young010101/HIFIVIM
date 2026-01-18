@@ -11,6 +11,7 @@ from utils import BVALS, get_composite_sens
 from bart import bart
 import utils
 import dict_gen_dtd
+import plot_utils
 
 # %% global parameters
 args = SimpleNamespace()
@@ -102,8 +103,7 @@ print(f'{dtd_gamma_bdelta_0.shape}')
 utils.show_imgs(np.abs(recon_fmac_basis.squeeze().transpose(2,0,1)))
 utils.show_imgs(np.abs(dtd_gamma_bdelta_0.transpose(2,0,1)))
 utils.show_imgs((np.abs(recon_fmac_basis.squeeze()) - np.abs(dtd_gamma_bdelta_0)).transpose(2,0,1))
-# plot_recon_vs_ivim(recon_fmac_basis, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
-# %%
+plot_utils.plot_recon_vs_ivim(recon_fmac_basis, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
 
 
 # %%
