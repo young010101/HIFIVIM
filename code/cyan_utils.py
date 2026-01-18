@@ -100,9 +100,9 @@ def make_phantom(args, show=True, slice=90, points=None, bvals=BVALS):
                 CSFmask[i, j] = 1
 
 
-            phantom_data[i,j] = dtd_gamma_model(10, md[i,j], vi[i,j], va[i,j], bvals)
+            phantom_data[i,j] = dtd_gamma_model(1, md[i,j], vi[i,j], va[i,j], bvals)
             phantom_data[i,j][md[i,j] == 0] =0
-            phantom_data_b_delta_1[i,j] = dtd_gamma_model(10, md[i,j], vi[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
+            phantom_data_b_delta_1[i,j] = dtd_gamma_model(1, md[i,j], vi[i,j], va[i,j], bvals, b_delta=np.ones_like(bvals))
             phantom_data_b_delta_1[i,j][md[i,j] == 0] =0
 
 

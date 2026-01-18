@@ -7,8 +7,10 @@ import sigpy as sp
 import sigpy.mri as mr
 import sigpy.plot as pl
 import matplotlib.pyplot as plt
-from utils import BVALS
+from utils import BVALS, get_composite_sens
 from bart import bart
+import utils
+import dict_gen_dtd
 
 # %% global parameters
 args = SimpleNamespace()
@@ -18,13 +20,6 @@ num_bvals = len(BVALS)
 
 # %% define some useful functions
 
-# %% generate phantom
-mean_diff, var_iso, var_aniso, dtd_gamma_bdelta_0, dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)
-x_dim = dtd_gamma_bdelta_0.shape[0]
-y_dim = dtd_gamma_bdelta_0.shape[1]
-dtd_gamma_bdelta_0_rot90 = np.rot90(dtd_gamma_bdelta_0, k=1)
-if False:
-    cyan_utils.show_15_bvals(dtd_gamma_bdelta_0_rot90)
 
 def get_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
     """
@@ -47,7 +42,16 @@ def get_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
 
     return ksp, mps_cxy
 
-ksp_bdelta_0, mps_true = get_coil_ksp(dtd_gamma_bdelta_0_rot90)
+
+# %% generate phantom
+mean_diff, var_iso, var_aniso, _dtd_gamma_bdelta_0, _dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)
+dtd_gamma_bdelta_0 = np.rot90(_dtd_gamma_bdelta_0, k=1)
+x_dim = _dtd_gamma_bdelta_0.shape[0]
+y_dim = _dtd_gamma_bdelta_0.shape[1]
+if False:
+    cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
+
+ksp_bdelta_0, mps_true = get_coil_ksp(dtd_gamma_bdelta_0)
 fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:,:,None,:,:] # Nx, Ny, 1, coils, bvals
     
 # %% estimate sensitivity maps from bdelta=0 data
@@ -60,18 +64,46 @@ sens_maps_expand = np.moveaxis(mps_estimated, 0, -1)[..., None, :]  # Nx, Ny, 1,
 if False:
     pl.ImagePlot(mps_estimated, title='Estimated Sensitivity Maps')
 
-# %% todo
-sens_prelim_fix = np.zeros((x_dim, y_dim, num_bvals), dtype=np.complex128)
+# %% pics reconstruction with estimated sensitivity maps
+sense_prelim = np.zeros((x_dim, y_dim, num_bvals), dtype=np.complex128)
 for i in range(num_bvals):
     # sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps)
-    sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_bdelta_0[...,i], sens_maps_expand)
+    sense_prelim[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_bdelta_0[...,i], sens_maps_expand)
 
 if False:
     plt.figure(figsize=(15,3))
     for idx, (i, j) in enumerate(POINTS):
         ax = plt.subplot(1, len(POINTS), idx + 1)
-        ax.plot(BVALS, dtd_gamma_bdelta_0_rot90[i, j], 'o-', label=r'$b_{\Delta}=0$')
+        ax.plot(BVALS, dtd_gamma_bdelta_0[i, j], 'o-', label=r'$b_{\Delta}=0$')
         # ax.plot(BVALS, dtd_gamma_bdelta_1[i, j], 'x--', label=r'$b_{\Delta}=1$')
-        ax.plot(BVALS, abs(sens_prelim_fix[i, j]), 's-.', label='Sens. Recon.')
+        ax.plot(BVALS, abs(sense_prelim[i, j]), 's-.', label='Sens. Recon.')
         ax.legend()
+# %% get composite sensitivity maps: sensitivity maps + phase estimation from hamming windowed
+_composite_sens, _ = get_composite_sens(sense_prelim, sens_maps_expand, visualize="True")  # 164 x 164 x 16 x 15 x 1
+composite_sens = np.expand_dims(np.transpose(_composite_sens, (0, 1, 4, 2, 3)), axis=4)
+if False:
+    print('Composite Sens shape:', composite_sens.shape)  # Nx, Ny, 1, coils, 1, bvals
+
+# %% gen dict
+basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
+print('Basis shape:', basis.shape)  # Nb, num_basis
+# %%
+fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)  # Nx, Ny, 1, coils, 1, bvals
+recon, recon_fmac_basis = utils.llr_recon_with_retry(
+    fft_bdelta_0_expand,
+    composite_sens,
+    basis[:, :2],
+    use_basis=True,
+    lambda1=0.001,
+    lambda2=0.001,
+)
+print(f'Reconstructed FMAC basis shape: {recon_fmac_basis.shape}, max {np.max(np.abs(recon_fmac_basis))}')  # Nx, Ny, 1, 1, 1, num_basis
+print(f'{dtd_gamma_bdelta_0.shape}')
+utils.show_imgs(np.abs(recon_fmac_basis.squeeze().transpose(2,0,1)))
+utils.show_imgs(np.abs(dtd_gamma_bdelta_0.transpose(2,0,1)))
+utils.show_imgs((np.abs(recon_fmac_basis.squeeze()) - np.abs(dtd_gamma_bdelta_0)).transpose(2,0,1))
+# plot_recon_vs_ivim(recon_fmac_basis, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
+# %%
+
+
 # %%

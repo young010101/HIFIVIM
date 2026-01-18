@@ -56,7 +56,7 @@ Functions for model-based IVIM/IVIM-LLR
 BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 
 
-def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10)):
+def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10), colorbar=False):
     imgs = np.asarray(imgs)
     N = imgs.shape[0]
     if ncols is None:
@@ -68,11 +68,13 @@ def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10)):
 
     for i, ax in enumerate(axes):
         if i < N:
-            ax.imshow(imgs[i], cmap=cmap)
+            ims = ax.imshow(imgs[i], cmap=cmap)
             if titles:
                 ax.set_title(titles[i])
+            if colorbar:
+                plt.colorbar(ims, ax=ax)
         ax.axis('off')
-    plt.tight_layout()
+    fig.tight_layout()
     plt.show()
 
 
