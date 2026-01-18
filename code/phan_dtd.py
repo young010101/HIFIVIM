@@ -22,7 +22,7 @@ num_bvals = len(BVALS)
 # %% define some useful functions
 
 
-def get_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
+def simulate_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
     """
     Parameters
     ----------
@@ -52,7 +52,7 @@ y_dim = _dtd_gamma_bdelta_0.shape[1]
 if False:
     cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
 
-ksp_bdelta_0, mps_true = get_coil_ksp(dtd_gamma_bdelta_0)
+ksp_bdelta_0, mps_true = simulate_coil_ksp(dtd_gamma_bdelta_0)
 fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:,:,None,:,:] # Nx, Ny, 1, coils, bvals
     
 # %% estimate sensitivity maps from bdelta=0 data
