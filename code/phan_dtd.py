@@ -154,7 +154,10 @@ def show_variant_grid(results, title_prefix="Recon |mean|"):
 
 # %% generate phantom
 mean_diff, var_iso, var_aniso, _dtd_gamma_bdelta_0, _dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)
-dtd_gamma_bdelta_0 = np.rot90(_dtd_gamma_bdelta_0, k=1)
+if False:
+    dtd_gamma_bdelta_0 = np.rot90(_dtd_gamma_bdelta_0, k=1)
+else:
+    dtd_gamma_bdelta_0 = _dtd_gamma_bdelta_0
 if False:
     cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
 
@@ -177,7 +180,33 @@ help_show_imgs(dtd_gamma_bdelta_0)
 help_show_imgs(np.abs(ref_recon.squeeze()) - np.abs(dtd_gamma_bdelta_0), cmap='bwr')
 help_show_imgs(ref_recon.squeeze() - dtd_gamma_bdelta_0)
 print('MSE:', np.mean((np.abs(ref_recon.squeeze()) - dtd_gamma_bdelta_0)**2))
-plot_utils.plot_recon_vs_ivim(ref_recon, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
+plot_utils.plot_recon_vs_ivim(
+    (
+        ref_recon.squeeze().real, 
+        recon_results['noise'].squeeze().real, 
+        dtd_gamma_bdelta_0), 
+    BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
+
+plot_utils.plot_recon_vs_ivim(
+    {
+        "clean": ref_recon.squeeze().real, 
+        "noise": recon_results['noise'].squeeze().real, 
+        "phase": recon_results['phase'].squeeze().real,
+        "phase_noise": recon_results['phase_noise'].squeeze().real,
+        "ground_truth": dtd_gamma_bdelta_0
+    }, 
+    BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0,
+    figure_kwargs={'figsize': (15, 10)})
+
+plot_utils.plot_recon_vs_ivim(
+    {
+        "clean": ref_recon.squeeze().real, 
+        "phase": recon_results['phase'].squeeze().real,
+    }, 
+    BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0,
+    figure_kwargs={'figsize': (15, 10)})
+
+
 
 # %%
 save_nifti(ref_recon.squeeze(), ps=ps, filename='phan_dtd_recon_2basis', ref_path=None, debug=True)
