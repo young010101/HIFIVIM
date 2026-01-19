@@ -88,11 +88,14 @@ y_dim = _dtd_gamma_bdelta_0.shape[1]
 if False:
     cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
 
+composite_dtd = np.asarray(dtd_gamma_bdelta_0, dtype=np.complex128).copy()
 if False:
-    composite_ivim = Phantom_utils.add_phase(args, dtd_gamma_bdelta_0,
+    composite_dtd = Phantom_utils.add_phase(args, composite_dtd,
                             show=True)  # 164 x 164 x 15 - but now with different phase for each b-value.
+if False:
+    composite_dtd = utils.add_noise(composite_dtd, 20, return_img=False)
 
-ksp_bdelta_0, mps_true = simulate_coil_ksp(dtd_gamma_bdelta_0)
+ksp_bdelta_0, mps_true = simulate_coil_ksp(composite_dtd)
 fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:,:,None,:,:] # Nx, Ny, 1, coils, bvals
     
 # %% estimate sensitivity maps from bdelta=0 data
