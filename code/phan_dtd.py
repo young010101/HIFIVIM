@@ -79,80 +79,105 @@ def save_nifti(img_data, ps, filename=None, ref_path=None, debug=False) -> None:
     if debug:
         print(os.listdir(out_path))
 
+def apply_effects(img_xyb, add_phase=False, add_noise=False, noise_sigma=20, show=False):
+    out = np.asarray(img_xyb, dtype=np.complex128).copy()
+    if add_phase:
+        out = Phantom_utils.add_phase(args, out, show=show)
+    if add_noise:
+        out = utils.add_noise(out, noise_sigma, return_img=False)
+    return out
+
+
+def build_variants(img_xyb, noise_sigma=20, show=False):
+    variant_flags = [
+        ("clean", False, False),
+        ("phase", True, False),
+        ("noise", False, True),
+        ("phase_noise", True, True),
+    ]
+    variants = {}
+    for name, add_phase, add_noise in variant_flags:
+        variants[name] = apply_effects(
+            img_xyb, add_phase=add_phase, add_noise=add_noise,
+            noise_sigma=noise_sigma, show=show
+        )
+    return variants
+
+
+def run_pipeline(composite_dtd, basis, num_bvals):
+    ksp_bdelta_0, _ = simulate_coil_ksp(composite_dtd)
+    fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:, :, None, :, :]
+
+    ksp_calib = np.mean(ksp_bdelta_0, axis=-1)
+    app = mr.app.EspiritCalib(ksp_calib, calib_width=24, device=sp.Device(0))
+    mps_estimated = app.run()
+    mps_estimated = sp.to_device(mps_estimated, sp.cpu_device)
+    sens_maps_expand = np.moveaxis(mps_estimated, 0, -1)[..., None, :]
+
+    sense_prelim = np.zeros((*composite_dtd.shape[:2], num_bvals), dtype=np.complex128)
+    for i in range(num_bvals):
+        sense_prelim[..., i] = bart(
+            1, 'pics -S -l2 -r0.001 -i 10',
+            fft_bdelta_0[..., i], sens_maps_expand
+        )
+
+    _composite_sens, _ = get_composite_sens(
+        sense_prelim, sens_maps_expand, visualize="True"
+    )
+    composite_sens = np.expand_dims(
+        np.transpose(_composite_sens, (0, 1, 4, 2, 3)), axis=4
+    )
+
+    fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)
+    basis2 = basis[..., :2]
+    _, recon_fmac_basis = utils.llr_recon_with_retry(
+        fft_bdelta_0_expand,
+        composite_sens,
+        basis2,
+        use_basis=True,
+        lambda1=0.001,
+        lambda2=0.001,
+    )
+    return recon_fmac_basis
+
+
+def show_variant_grid(results, title_prefix="Recon |mean|"):
+    plt.figure(figsize=(8, 8))
+    for idx, (name, recon_fmac_basis) in enumerate(results.items()):
+        img = np.mean(np.abs(recon_fmac_basis.squeeze()), axis=-1)
+        ax = plt.subplot(2, 2, idx + 1)
+        ax.imshow(img, cmap='gray')
+        ax.set_title(name)
+        ax.axis('off')
+    plt.suptitle(title_prefix)
+
 
 # %% generate phantom
 mean_diff, var_iso, var_aniso, _dtd_gamma_bdelta_0, _dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)
 dtd_gamma_bdelta_0 = np.rot90(_dtd_gamma_bdelta_0, k=1)
-x_dim = _dtd_gamma_bdelta_0.shape[0]
-y_dim = _dtd_gamma_bdelta_0.shape[1]
 if False:
     cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
 
-composite_dtd = np.asarray(dtd_gamma_bdelta_0, dtype=np.complex128).copy()
-if False:
-    composite_dtd = Phantom_utils.add_phase(args, composite_dtd,
-                            show=True)  # 164 x 164 x 15 - but now with different phase for each b-value.
-if False:
-    composite_dtd = utils.add_noise(composite_dtd, 20, return_img=False)
-
-ksp_bdelta_0, mps_true = simulate_coil_ksp(composite_dtd)
-fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:,:,None,:,:] # Nx, Ny, 1, coils, bvals
-    
-# %% estimate sensitivity maps from bdelta=0 data
-ksp_calib = np.mean(ksp_bdelta_0, axis=-1)
-app = mr.app.EspiritCalib(ksp_calib, calib_width=24, device=sp.Device(0))
-mps_estimated = app.run()
-mps_estimated = sp.to_device(mps_estimated, sp.cpu_device)
-sens_maps_expand = np.moveaxis(mps_estimated, 0, -1)[..., None, :]  # Nx, Ny, 1, coils 
-
-if False:
-    pl.ImagePlot(mps_estimated, title='Estimated Sensitivity Maps')
-
-# %% pics reconstruction with estimated sensitivity maps
-sense_prelim = np.zeros((x_dim, y_dim, num_bvals), dtype=np.complex128)
-for i in range(num_bvals):
-    # sens_prelim_fix[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_ivim[...,i], sens_maps)
-    sense_prelim[..., i] = bart(1, 'pics -S -l2 -r0.001 -i 10', fft_bdelta_0[...,i], sens_maps_expand)
-
-if False:
-    plt.figure(figsize=(15,3))
-    for idx, (i, j) in enumerate(POINTS):
-        ax = plt.subplot(1, len(POINTS), idx + 1)
-        ax.plot(BVALS, dtd_gamma_bdelta_0[i, j], 'o-', label=r'$b_{\Delta}=0$')
-        # ax.plot(BVALS, dtd_gamma_bdelta_1[i, j], 'x--', label=r'$b_{\Delta}=1$')
-        ax.plot(BVALS, abs(sense_prelim[i, j]), 's-.', label='Sens. Recon.')
-        ax.legend()
-# %% get composite sensitivity maps: sensitivity maps + phase estimation from hamming windowed
-_composite_sens, _ = get_composite_sens(sense_prelim, sens_maps_expand, visualize="True")  # 164 x 164 x 16 x 15 x 1
-composite_sens = np.expand_dims(np.transpose(_composite_sens, (0, 1, 4, 2, 3)), axis=4)
-if False:
-    print('Composite Sens shape:', composite_sens.shape)  # Nx, Ny, 1, coils, 1, bvals
-
-# %% gen dict
 basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
 print('Basis shape:', basis.shape)  # Nb, num_basis
-# %%
-fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)  # Nx, Ny, 1, coils, 1, bvals
-basis2 = basis[..., :2]  # Nb, 2
-recon, recon_fmac_basis = utils.llr_recon_with_retry(
-    fft_bdelta_0_expand,
-    composite_sens,
-    basis2,
-    use_basis=True,
-    lambda1=0.001,
-    lambda2=0.001,
-)
-print(f"coeff shape: {recon.shape}, basis shape: {basis2.shape}")  # Nx, Ny, 1, 1, 1, 1, num_coeff
-print(f'Reconstructed FMAC basis shape: {recon_fmac_basis.shape}, max {np.max(np.abs(recon_fmac_basis))}')  # Nx, Ny, 1, 1, 1, num_basis
-print(f'{dtd_gamma_bdelta_0.shape}')
 
-help_show_imgs(recon_fmac_basis.squeeze())
+base_dtd = np.asarray(dtd_gamma_bdelta_0, dtype=np.complex128).copy()
+variants = build_variants(base_dtd, noise_sigma=20, show=False)
+
+recon_results = {}
+for name, composite_dtd in variants.items():
+    recon_results[name] = run_pipeline(composite_dtd, basis=basis, num_bvals=num_bvals)
+
+show_variant_grid(recon_results, title_prefix="Recon |mean| across bvals")
+
+# %% gen dict
+ref_recon = recon_results["clean"]
+help_show_imgs(ref_recon.squeeze())
 help_show_imgs(dtd_gamma_bdelta_0)
-help_show_imgs(np.abs(recon_fmac_basis.squeeze()) - np.abs(dtd_gamma_bdelta_0), cmap='bwr')
-help_show_imgs(recon_fmac_basis.squeeze() - dtd_gamma_bdelta_0)
-print('MSE:', np.mean((np.abs(recon_fmac_basis.squeeze()) - dtd_gamma_bdelta_0)**2))
-plot_utils.plot_recon_vs_ivim(recon_fmac_basis, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
-
+help_show_imgs(np.abs(ref_recon.squeeze()) - np.abs(dtd_gamma_bdelta_0), cmap='bwr')
+help_show_imgs(ref_recon.squeeze() - dtd_gamma_bdelta_0)
+print('MSE:', np.mean((np.abs(ref_recon.squeeze()) - dtd_gamma_bdelta_0)**2))
+plot_utils.plot_recon_vs_ivim(ref_recon, dtd_gamma_bdelta_0, BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
 
 # %%
-save_nifti(recon_fmac_basis.squeeze(), ps=ps, filename='phan_dtd_recon_2basis', ref_path=None, debug=True)
+save_nifti(ref_recon.squeeze(), ps=ps, filename='phan_dtd_recon_2basis', ref_path=None, debug=True)
