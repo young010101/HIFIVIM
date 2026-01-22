@@ -15,17 +15,14 @@ import plot_utils
 import nibabel as nib
 import os
 import Phantom_utils
-from scipy.io import loadmat
 
 # %% global parameters
 args = SimpleNamespace()
 args.outdir = '../Phantom/'
 ps = SimpleNamespace() 
-ps.bp = '/data/users/cyang/dtd_subspace/0119_ngc'  # <- base path
-PROTOCOL = "6_STEs_2mmiso_PA"
-ps.ip = os.path.join(ps.bp, 'DATA', 'brain', PROTOCOL, 'NII')  # <- actual input data
-ps.mat_p =  os.path.join(ps.bp, 'DATA', 'brain', PROTOCOL, 'MAT')
-ps.op = os.path.join(ps.bp, 'processed', 'brain', PROTOCOL)  # <- store output here
+ps.bp = '../Phantom/phan_cyan'  # <- base path
+ps.ip = os.path.join(ps.bp, 'DATA', 'phan_brain', 'NII')  # <- actual input data
+ps.op = os.path.join(ps.bp, 'processed', 'phan_brain')  # <- store output here
 ps.zp = os.path.join(ps.bp, 'tmp')  # <- store temporary files here
 
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
@@ -154,72 +151,6 @@ def show_variant_grid(results, title_prefix="Recon |mean|"):
         ax.axis('off')
     plt.suptitle(title_prefix)
 
-
-# %%
-bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
-BVALS = bval
-
-basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
-
-# Load .mat file and extract variables
-mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
-import h5py
-with h5py.File(os.path.join(ps.mat_p, "k_ngc_all.mat"), 'r') as f:
-    k_ngc_all = f['k_ngc_all'][:]
-import h5py
-import numpy as np
-import os
-
-def load_cell_array(path, key):
-    with h5py.File(path, "r") as f:
-        refs = np.array(f[key])          # convert to ndarray of object refs
-        out = []
-        for ref in refs.ravel():         # flatten to 1D
-            ds = f[ref]
-            arr = ds[()]                 # read dataset
-            if arr.dtype.names is not None and set(arr.dtype.names) == {"real", "imag"}:
-                arr = arr["real"] + 1j * arr["imag"]
-            out.append(np.array(arr))
-    return np.array(out, dtype=object)
-
-k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
-Img_Grappa_all = mat_data['Img_Grappa_all']
-k_pparef_ngc = mat_data['k_pparef_ngc']
-composite_dtd = k_ngc_all
-
-ksp_bdelta_0, _ = simulate_coil_ksp(composite_dtd)
-fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:, :, None, :, :]
-
-ksp_calib = np.mean(ksp_bdelta_0, axis=-1)
-app = mr.app.EspiritCalib(ksp_calib, calib_width=24, device=sp.Device(0))
-mps_estimated = app.run()
-mps_estimated = sp.to_device(mps_estimated, sp.cpu_device)
-sens_maps_expand = np.moveaxis(mps_estimated, 0, -1)[..., None, :]
-
-sense_prelim = np.zeros((*composite_dtd.shape[:2], num_bvals), dtype=np.complex128)
-for i in range(num_bvals):
-    sense_prelim[..., i] = bart(
-        1, 'pics -S -l2 -r0.001 -i 10',
-        fft_bdelta_0[..., i], sens_maps_expand
-    )
-
-_composite_sens, _ = get_composite_sens(
-    sense_prelim, sens_maps_expand, visualize="True"
-)
-composite_sens = np.expand_dims(
-    np.transpose(_composite_sens, (0, 1, 4, 2, 3)), axis=4
-)
-
-fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)
-basis2 = basis[..., :2]
-_, recon_fmac_basis = utils.llr_recon_with_retry(
-    fft_bdelta_0_expand,
-    composite_sens,
-    basis2,
-    use_basis=True,
-    lambda1=0.001,
-    lambda2=0.001,
-)
 
 # %% generate phantom
 mean_diff, var_iso, var_aniso, _dtd_gamma_bdelta_0, _dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)

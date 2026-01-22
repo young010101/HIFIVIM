@@ -150,7 +150,7 @@ def extract_basis_set(ivim_dicc, num_basis, debug=False, bvals=BVALS):
 @timeit
 def basis_pipeline(num_basis, bvals, outdir=None, debug=False):
     ivim_dicc = generate_dictionary(bvals=bvals)
-    basis, _S1 = extract_basis_set(ivim_dicc, num_basis, debug=debug) 
+    basis, _S1 = extract_basis_set(ivim_dicc, num_basis,bvals=bvals, debug=debug) 
     if outdir is not None:
         cfl.writecfl(os.path.join(outdir, 'dtd_bdelta1_basis_{}'.format(num_basis)), (basis))
     return basis
