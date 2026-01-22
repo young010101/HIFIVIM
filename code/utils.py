@@ -327,12 +327,13 @@ def get_composite_sens(data, sens_maps, bvals=None, visualize="False", title='')
     bvals1 = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
     if bvals is None:
         bvals = [0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000]
-    indices = [i for i, item in enumerate(bvals1) if item in (bvals)]
+    num_bvals = len(bvals)
+    indices = [i for i, item in enumerate(bvals) if item in (bvals)]
 
     composite_sens = np.zeros((data.shape[0], data.shape[1], sens_maps.shape[-1], data.shape[-1]),
                               dtype=np.complex128)
     shift_amount = int(-np.ceil(164 / (2 * 2)))
-    phase_estimates = np.zeros((data.shape[0], data.shape[1], 15), dtype=np.complex128)
+    phase_estimates = np.zeros((data.shape[0], data.shape[1], num_bvals), dtype=np.complex128)
     phase_estimates = phase_estimates[...,indices]
     for i in range(data.shape[-1]):
         phase_estimate = phase_estimate_(data.squeeze()[:, :, i])  # estimate low resolution phase
