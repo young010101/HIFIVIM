@@ -1,0 +1,25 @@
+{
+  "paths": {
+    "base": "/data/users/cyang/dtd_subspace/0119_ngc",
+    "tmp_rel": "tmp",
+    "raw_stes": "/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA"
+  },
+  "dataset": {
+    "type": "brain",
+    "protocol": "6_STEs_2mmiso_PA"
+  },
+  "layout": {
+    "input_rel": "DATA/{type}/{protocol}/NII",
+    "nii_rel": "DATA/{type}/{protocol}/NII",
+    "mat_rel": "DATA/{type}/{protocol}/MAT",
+    "bart_rel": "DATA/{type}/{protocol}/BART",
+    "output_rel": "processed/{type}/{protocol}"
+  },
+  "debug": {
+    "level": 1
+  },
+  "dicom" :{
+    "dicom_nii": "/data/users/cyang/DICOM_YANGCHENG/NII",
+    "STEs": "_STEs_2mmiso_PA_20260118122029_601"
+  }
+}

@@ -40,6 +40,7 @@ from scipy import stats
 from sklearn.metrics import mean_squared_error
 from skimage.registration import phase_cross_correlation
 import time
+import plot_utils
 
 '''
 Author: Alan Finkelstein. 
@@ -56,26 +57,54 @@ Functions for model-based IVIM/IVIM-LLR
 BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 
 
-def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10), colorbar=False):
-    imgs = np.asarray(imgs)
-    N = imgs.shape[0]
-    if ncols is None:
-        ncols = int(np.ceil(np.sqrt(N)))
-    nrows = int(np.ceil(N / ncols))
+def pipe(mbref_slc_bart, debug=True):
+    # todo use original
+    mbref_sens = bart(1, 'ecalib -m1', mbref_slc_bart)
+    if debug:
+        print(mbref_sens.shape)
+        if mbref_sens.shape[2] == 1:
+            plot_utils.help_show_imgs(mbref_sens.squeeze())
+        else:
+            plot_utils.help_show_imgs(mbref_sens[:,:, 35])
+    #   , ncols=4, titles=[f"Coil {i}" for i in range(mbref_sens.shape[3])])
+    if debug: 
+        level_debug = '-d 5'
+    pics_cmd = f'pics {level_debug} -S -e -l2 -r0.01'
+    if debug:
+        print(pics_cmd)
+    rec_ESPIRiT_full_mbref = bart(1, pics_cmd, mbref_slc_bart, mbref_sens)
+    if debug:
+        print(rec_ESPIRiT_full_mbref.shape)
+        if rec_ESPIRiT_full_mbref.ndim == 2:
+        # plot_utils.show_imgs(abs(rec_ESPIRiT_full_mbref[None,...]))
+            plt.imshow(abs(rec_ESPIRiT_full_mbref), cmap='gray')
+            plt.colorbar()
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
-    axes = np.atleast_1d(axes).ravel()
 
-    for i, ax in enumerate(axes):
-        if i < N:
-            ims = ax.imshow(imgs[i], cmap=cmap)
-            if titles:
-                ax.set_title(titles[i])
-            if colorbar:
-                plt.colorbar(ims, ax=ax)
-        ax.axis('off')
-    fig.tight_layout()
-    plt.show()
+    rec_SMSNLINV_full_mbref = bart(1, "nlinv -S -i 9", mbref_slc_bart)
+    if debug:
+        print(rec_SMSNLINV_full_mbref.shape)
+        # show_imgs(abs(rec_SMSNLINV_full_mbref[None, ...]))
+        if rec_SMSNLINV_full_mbref.ndim == 2:
+            plt.imshow(abs(rec_SMSNLINV_full_mbref), cmap='gray')
+            plt.colorbar()
+    return rec_ESPIRiT_full_mbref, rec_SMSNLINV_full_mbref
+
+
+def embed_center(acs, mbref):
+    """
+    acs: shape (RO_acs, PE_acs, slice, COIL)  (complex)
+    return: full kspace (RO_full, PE_full, COIL) with ACS centered
+    """
+    RO_acs, PE_acs, S, C = acs.shape
+    RO_full, PE_full, S_full, Nc = mbref.shape
+    assert C == Nc, "Number of coils in acs and mbref must match."
+    out = mbref.copy() 
+
+    ro0 = (RO_full - RO_acs)//2
+    pe0 = (PE_full - PE_acs)//2
+    out[ro0:ro0+RO_acs, pe0:pe0+PE_acs, :, :] = acs
+    return out
 
 
 def ivim_model(f: float, D: float, Dstar: float, bvals):

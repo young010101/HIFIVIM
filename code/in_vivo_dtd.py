@@ -5,9 +5,8 @@ import cyan_utils
 import numpy as np
 import sigpy as sp
 import sigpy.mri as mr
-import sigpy.plot as pl
 import matplotlib.pyplot as plt
-from utils import BVALS, get_composite_sens
+from utils import get_composite_sens
 from bart import bart
 import utils
 import dict_gen_dtd
@@ -16,18 +15,38 @@ import nibabel as nib
 import os
 import Phantom_utils
 from scipy.io import loadmat
+import h5py
+import cfl
+import json
 
 # %% global parameters
+with open("../config.json", "r") as f:
+    cfg = json.load(f)
+
+base = cfg["paths"]["base"]
+typ = cfg["dataset"]["type"]
+protocol = cfg["dataset"]["protocol"]
+debug_level = cfg["debug"]["level"]
+
+def render(rel_tmpl):
+    return rel_tmpl.format(type=typ, protocol=protocol)
+
+print(f"Processing {typ} data with protocol {protocol}...")
+# %%
 args = SimpleNamespace()
 args.outdir = '../Phantom/'
 ps = SimpleNamespace() 
-ps.bp = '/data/users/cyang/dtd_subspace/0119_ngc'  # <- base path
-PROTOCOL = "6_STEs_2mmiso_PA"
-ps.ip = os.path.join(ps.bp, 'DATA', 'brain', PROTOCOL, 'NII')  # <- actual input data
-ps.mat_p =  os.path.join(ps.bp, 'DATA', 'brain', PROTOCOL, 'MAT')
-ps.op = os.path.join(ps.bp, 'processed', 'brain', PROTOCOL)  # <- store output here
-ps.zp = os.path.join(ps.bp, 'tmp')  # <- store temporary files here
-
+PROTOCOL = protocol
+ps.nii_p = os.path.join(base, render(cfg["layout"]["input_rel"]))  # <- actual input data
+ps.mat_p =  os.path.join(base, render(cfg["layout"]["mat_rel"]))  # <- .mat files path
+ps.bart_p = os.path.join(base, render(cfg["layout"]["bart_rel"]))  # <- .bart files path
+ps.ip = ps.nii_p
+ps.op = os.path.join(base, render(cfg["layout"]["output_rel"]))  # <- store output here
+ps.zp = os.path.join(base, cfg["paths"]["tmp_rel"])  # <- store temporary files here
+if debug_level >= 1:
+    print(ps.nii_p)
+    print(ps.mat_p)
+    print(ps.bart_p)
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
 BVALS = bval
@@ -56,10 +75,6 @@ def simulate_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
         ksp = sp.fft(coil_imgs, axes=(1, 2))
 
     return ksp, mps_cxy
-
-
-def help_show_imgs(imgs, cmap='gray'):
-    utils.show_imgs(np.abs(imgs.transpose(2,0,1)), cmap=cmap)
 
 
 def save_nifti(img_data, ps, filename=None, ref_path=None, debug=False) -> None:
@@ -161,14 +176,6 @@ def show_variant_grid(results, title_prefix="Recon |mean|"):
 
 basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
 
-# Load .mat file and extract variables
-mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
-import h5py
-with h5py.File(os.path.join(ps.mat_p, "k_ngc_all.mat"), 'r') as f:
-    k_ngc_all = f['k_ngc_all'][:]
-import h5py
-import numpy as np
-import os
 
 def load_cell_array(path, key):
     with h5py.File(path, "r") as f:
@@ -188,13 +195,22 @@ def load_cell_array(path, key):
 
 k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
 k_ngc_all = k_ngc_all.squeeze()
+print('k_ngc_all shape:', k_ngc_all.shape)
+plot_utils.show_imgs(np.abs(sp.fft(k_ngc_all[0,0,0:16,...], axes=(1,2))), cmap='gray')
+k_ngc_all_transposed = np.transpose(k_ngc_all[0,0,0,...].squeeze(), (2, 1, 0))
+
+# Load .mat file and extract variables
+mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
 Img_Grappa_all = mat_data['Img_Grappa_all']
-k_pparef_ngc = mat_data['k_pparef_ngc']
+k_pparef_ngc = mat_data['k_pparef_ngc_reshape']
+if debug_level >= 1:
+    print('Img_Grappa_all shape:', Img_Grappa_all.shape)
+    print('k_pparef_ngc shape:', k_pparef_ngc.shape)
 
 # k_ngc_all: (57, 4, 64, 112, 112)
 # take first slice of the 2nd dim (index 0), then reorder to (64, 112, 112, 57)
 k_first = k_ngc_all[:, 0, :, :, :]          # (57, 64, 112, 112)
-k_reordered = np.transpose(k_first, (1, 2, 3, 0))  # (64, 112, 112, 57)
+k_reordered = np.transpose(k_first, (1, 3, 2, 0))  # (64, 112, 112, 57)
 
 ksp_bdelta_0 = k_reordered
 
@@ -212,17 +228,23 @@ for b_idx in range(_fft_bdelta_0.shape[-1]):
 
 ksp_bdelta_0 = fft_bdelta_0.squeeze().transpose(2, 0, 1, 3)[:, :, :, :]
 
+# %%
 # for b_idx in range(_fft_bdelta_0.shape[-1]):
 b_idx = 0
-sens_fft_bdelta_0_by_bart = bart(1, "ecalib -m1", fft_bdelta_0[..., b_idx])
+pparef_slc = k_pparef_ngc[:, :, :, 33]
+print(f"pparef_slc shape: {pparef_slc.shape}")
+pparef_slc = bart(1, f"cc -p{num_coils} -A -S", pparef_slc[:,:,None,:])
+mbref_embed = utils.embed_center(pparef_slc, fft_bdelta_0[..., b_idx])
+sens_fft_bdelta_0_by_bart = bart(1, "ecalib -m1", mbref_embed)
 print('Sens map shape by bart ecalib:', sens_fft_bdelta_0_by_bart.shape)
-help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze())
+utils.help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze())
 
 ksp_calib = np.mean(ksp_bdelta_0, axis=-1)
 app = mr.app.EspiritCalib(ksp_calib, calib_width=24, device=sp.Device(0))
 mps_estimated = app.run()
 mps_estimated = sp.to_device(mps_estimated, sp.cpu_device)
 sens_maps_expand = np.moveaxis(mps_estimated, 0, -1)[..., None, :]
+sens_maps_expand = sens_fft_bdelta_0_by_bart
 
 sense_prelim = np.zeros((*fft_bdelta_0.shape[:2], num_bvals), dtype=np.complex128)
 for i in range(num_bvals):
@@ -231,6 +253,7 @@ for i in range(num_bvals):
         fft_bdelta_0[..., i], sens_maps_expand
     )
 print('Sense prelim shape:', sense_prelim.shape)
+utils.help_show_imgs(np.abs(sense_prelim[...,:16]))
 
 _composite_sens, _ = utils.get_composite_sens(
     sense_prelim, sens_maps_expand, bvals=BVALS, visualize="True"
@@ -249,66 +272,24 @@ _, recon_fmac_basis = utils.llr_recon_with_retry(
     lambda1=0.001,
     lambda2=0.001,
 )
-import cfl
 # Ensure output directory exists before writing CFL
 os.makedirs(ps.op, exist_ok=True)
 cfl.writecfl(os.path.join(ps.op, 'phan_dtd_recon_2basis'), recon_fmac_basis)
 
-# %% generate phantom
-mean_diff, var_iso, var_aniso, _dtd_gamma_bdelta_0, _dtd_gamma_bdelta_1, masks = cyan_utils.make_phantom(args, show=True, points=POINTS)
-if False:
-    dtd_gamma_bdelta_0 = np.rot90(_dtd_gamma_bdelta_0, k=1)
-else:
-    dtd_gamma_bdelta_0 = _dtd_gamma_bdelta_0
-if False:
-    cyan_utils.show_15_bvals(dtd_gamma_bdelta_0)
-
-basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
-print('Basis shape:', basis.shape)  # Nb, num_basis
-
-base_dtd = np.asarray(dtd_gamma_bdelta_0, dtype=np.complex128).copy()
-variants = build_variants(base_dtd, noise_sigma=20, show=False)
-
-recon_results = {}
-for name, composite_dtd in variants.items():
-    recon_results[name] = run_pipeline(composite_dtd, basis=basis, num_bvals=num_bvals)
-
-show_variant_grid(recon_results, title_prefix="Recon |mean| across bvals")
-
-# %% gen dict
-ref_recon = recon_results["clean"]
-help_show_imgs(ref_recon.squeeze())
-help_show_imgs(dtd_gamma_bdelta_0)
-help_show_imgs(np.abs(ref_recon.squeeze()) - np.abs(dtd_gamma_bdelta_0), cmap='bwr')
-help_show_imgs(ref_recon.squeeze() - dtd_gamma_bdelta_0)
-print('MSE:', np.mean((np.abs(ref_recon.squeeze()) - dtd_gamma_bdelta_0)**2))
-plot_utils.plot_recon_vs_ivim(
-    (
-        ref_recon.squeeze().real, 
-        recon_results['noise'].squeeze().real, 
-        dtd_gamma_bdelta_0), 
-    BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0)
-
-plot_utils.plot_recon_vs_ivim(
-    {
-        "clean": ref_recon.squeeze().real, 
-        "noise": recon_results['noise'].squeeze().real, 
-        "phase": recon_results['phase'].squeeze().real,
-        "phase_noise": recon_results['phase_noise'].squeeze().real,
-        "ground_truth": dtd_gamma_bdelta_0
-    }, 
-    BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0,
-    figure_kwargs={'figsize': (15, 10)})
-
-plot_utils.plot_recon_vs_ivim(
-    {
-        "clean": ref_recon.squeeze().real, 
-        "phase": recon_results['phase'].squeeze().real,
-    }, 
-    BVALS, POINTS, recon_label="2 basis", ivim_scale=1.0,
-    figure_kwargs={'figsize': (15, 10)})
-
-
-
 # %%
-save_nifti(ref_recon.squeeze(), ps=ps, filename='phan_dtd_recon_2basis', ref_path=None, debug=True)
+k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
+k_ngc_all_transposed = np.transpose(k_ngc_all[0,0,0,...].squeeze(), (2, 1, 0))
+print(f'k_ngc_all_transposed shape:, {k_ngc_all_transposed.shape}, dtype: {k_ngc_all_transposed.dtype}')
+print(f"is all zeros in even columns: {np.all(k_ngc_all_transposed[:,0::2] == 0)}, odd columns: {np.all(k_ngc_all_transposed[:,1::2] == 0)}")
+plot_utils.help_show_imgs(sp.fft(k_ngc_all_transposed[...,0:4]), cmap='gray')
+plt.imshow(k_ngc_all_transposed[:,1::2,0].real>1e-3, cmap='gray')
+
+mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
+k_pparef_ngc = mat_data['k_pparef_ngc_reshape']
+pparef_slc = k_pparef_ngc[:, :, :, 33]
+print(f"pparef_slc shape: {pparef_slc.shape}")
+pparef_slc = bart(1, f"cc -p{num_coils} -A -S", pparef_slc[:,:,None,:])
+mbref_embed = utils.embed_center(pparef_slc, fft_bdelta_0[..., b_idx])
+sens_fft_bdelta_0_by_bart = bart(1, "ecalib -m1", mbref_embed)
+print('Sens map shape by bart ecalib:', sens_fft_bdelta_0_by_bart.shape)
+utils.help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze())

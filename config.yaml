@@ -1,0 +1,12 @@
+paths:
+  base: /data/users/cyang/dtd_subspace/0119_ngc
+  tmp: tmp
+
+dataset:
+  type: brain
+  protocol: 6_STEs_2mmiso_PA
+
+layout:
+  input_rel: DATA/{type}/{protocol}/NII
+  mat_rel:   DATA/{type}/{protocol}/MAT
+  output_rel: processed/{type}/{protocol}

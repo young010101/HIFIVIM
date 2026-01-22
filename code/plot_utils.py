@@ -35,3 +35,30 @@ def plot_recon_vs_ivim(
     plt.ylabel("Signal Intensity")
     plt.title(f"{recon_label} Reconstructed Signal vs. Ground Truth IVIM Signal")
     plt.legend(legend_entries)
+
+
+def show_imgs(imgs, ncols=None, cmap='gray', titles=None, figsize=(10,10), colorbar=False):
+    imgs = np.asarray(imgs)
+    N = imgs.shape[0]
+    if ncols is None:
+        ncols = int(np.ceil(np.sqrt(N)))
+    nrows = int(np.ceil(N / ncols))
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    axes = np.atleast_1d(axes).ravel()
+
+    for i, ax in enumerate(axes):
+        if i < N:
+            ims = ax.imshow(imgs[i], cmap=cmap)
+            if titles:
+                ax.set_title(titles[i])
+            if colorbar:
+                plt.colorbar(ims, ax=ax)
+        ax.axis('off')
+    fig.tight_layout()
+    plt.show()
+
+
+def help_show_imgs(imgs, cmap='gray'):
+    show_imgs(np.abs(imgs.transpose(2,0,1)), cmap=cmap)
+
