@@ -1,4 +1,6 @@
 # %% import region
+import random
+import time
 from types import SimpleNamespace
 # import importlib
 import cyan_utils
@@ -18,6 +20,10 @@ from scipy.io import loadmat
 import h5py
 import cfl
 import json
+from tqdm import tqdm
+import multiprocessing
+import tempfile
+import shutil
 
 # %% global parameters
 with open("../config.json", "r") as f:
@@ -172,11 +178,6 @@ def show_variant_grid(results, title_prefix="Recon |mean|"):
     plt.suptitle(title_prefix)
 
 
-# %%
-
-basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
-
-
 def load_cell_array(path, key):
     with h5py.File(path, "r") as f:
         refs = np.array(f[key])          # convert to ndarray of object refs
@@ -193,67 +194,98 @@ def load_cell_array(path, key):
     except:
         return np.array(out, dtype=object)
 
+
+def bart_retry(nargout, cmd, *args, retries=3, base_sleep=0.5, jitter=0.2, tmp_root=None):
+    """
+    Retry wrapper for python-bart `bart(...)`.
+    - retries: number of extra attempts (total attempts = retries+1)
+    - tmp_root: if set, create a per-attempt TMPDIR under this root to avoid collisions
+    """
+    last_err = None
+
+    for attempt in range(retries + 1):
+        # optional per-attempt temp dir isolation (helps a lot in parallel)
+        tmpdir = None
+        old_tmp = os.environ.get("TMPDIR", None)
+
+        try:
+            if tmp_root is not None:
+                tmpdir = tempfile.mkdtemp(prefix="bart_", dir=tmp_root)
+                os.environ["TMPDIR"] = tmpdir
+
+            return bart(nargout, cmd, *args)
+
+        except Exception as e:
+            last_err = e
+
+            # cleanup temp dir
+            if tmpdir is not None:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                if old_tmp is None:
+                    os.environ.pop("TMPDIR", None)
+                else:
+                    os.environ["TMPDIR"] = old_tmp
+
+            if attempt == retries:
+                break
+
+            sleep_s = base_sleep * (2 ** attempt) * (1.0 + random.uniform(-jitter, jitter))
+            time.sleep(max(0.0, sleep_s))
+
+    raise last_err
+
+def in_vivo_pipe(k, acs, num_coils=None):
+
+    sens_fft_bdelta_0_by_bart = get_sens_by(k, acs)
+    
+    if debug_level >= 1:
+        print('Sens map shape by bart ecalib:', sens_fft_bdelta_0_by_bart.shape)
+        plot_utils.help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze())
+
+    _tmp =bart_retry( 1, 'pics -S -l2 -r0.001 -i 10', k, sens_fft_bdelta_0_by_bart)
+    if debug_level >= 1:
+        print('Tmp recon shape:', _tmp.shape)
+        plot_utils.help_show_imgs(np.abs(_tmp[...,None]), cmap='gray')
+    
+    return _tmp
+
+def get_sens_by(k, acs):
+
+    mbref_embed = utils.embed_center(acs, k)
+    sens_fft_bdelta_0_by_bart = bart_retry(1, "ecalib -m1", mbref_embed)
+
+    return sens_fft_bdelta_0_by_bart
+# %%
 k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
-k_ngc_all = k_ngc_all.squeeze()
-print('k_ngc_all shape:', k_ngc_all.shape)
-plot_utils.show_imgs(np.abs(sp.fft(k_ngc_all[0,0,0:16,...], axes=(1,2))), cmap='gray')
-k_ngc_all_transposed = np.transpose(k_ngc_all[0,0,0,...].squeeze(), (2, 1, 0))
+k = np.transpose(k_ngc_all[:,0,0,...].squeeze(), (3, 2, 1, 0))[:,:,None,:,:]
 
-# Load .mat file and extract variables
 mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
-Img_Grappa_all = mat_data['Img_Grappa_all']
-k_pparef_ngc = mat_data['k_pparef_ngc_reshape']
-if debug_level >= 1:
-    print('Img_Grappa_all shape:', Img_Grappa_all.shape)
-    print('k_pparef_ngc shape:', k_pparef_ngc.shape)
+k_pparef = mat_data['k_pparef_ngc_reshape'][:, :, :, 33][:,:,None,:]
 
-# k_ngc_all: (57, 4, 64, 112, 112)
-# take first slice of the 2nd dim (index 0), then reorder to (64, 112, 112, 57)
-k_first = k_ngc_all[:, 0, :, :, :]          # (57, 64, 112, 112)
-k_reordered = np.transpose(k_first, (1, 3, 2, 0))  # (64, 112, 112, 57)
+num_x, num_y, num_z, num_c, num_b = k.shape
+recon_demo = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
+# for b in tqdm(range(10,num_b)):
+#     recon_demo[..., b] = in_vivo_pipe(k[..., b], k_pparef, num_coils=16) 
 
-ksp_bdelta_0 = k_reordered
+plot_utils.help_show_imgs(np.abs(recon_demo[...,:16]), cmap='gray')
 
-_fft_bdelta_0 = ksp_bdelta_0.transpose(1, 2, 0, 3)[:, :, None, :, :]
-print(_fft_bdelta_0.shape)
-num_coils = 16
-
-# Apply coil compression per last dimension (b-value)
-fft_bdelta_0 = np.zeros(
-    (*_fft_bdelta_0.shape[:3], num_coils, _fft_bdelta_0.shape[-1]),
-    dtype=_fft_bdelta_0.dtype,
-)
-for b_idx in range(_fft_bdelta_0.shape[-1]):
-    fft_bdelta_0[..., b_idx] = bart(1, f"cc -p{num_coils} -A -S", _fft_bdelta_0[..., b_idx])
-
-ksp_bdelta_0 = fft_bdelta_0.squeeze().transpose(2, 0, 1, 3)[:, :, :, :]
+# with multiprocessing.Pool() as pool:
+#     results = pool.starmap(in_vivo_pipe, [(k[..., b], k_pparef) for b in range(num_b)])
+#     for b, result in enumerate(results):
+#         recon_demo[..., b] = result
 
 # %%
-# for b_idx in range(_fft_bdelta_0.shape[-1]):
-b_idx = 0
-pparef_slc = k_pparef_ngc[:, :, :, 33]
-print(f"pparef_slc shape: {pparef_slc.shape}")
-pparef_slc = bart(1, f"cc -p{num_coils} -A -S", pparef_slc[:,:,None,:])
-mbref_embed = utils.embed_center(pparef_slc, fft_bdelta_0[..., b_idx])
-sens_fft_bdelta_0_by_bart = bart(1, "ecalib -m1", mbref_embed)
-print('Sens map shape by bart ecalib:', sens_fft_bdelta_0_by_bart.shape)
-utils.help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze())
+fft_bdelta_0 = k
+sens_maps_expand = get_sens_by(fft_bdelta_0[..., 0], k_pparef)
 
-ksp_calib = np.mean(ksp_bdelta_0, axis=-1)
-app = mr.app.EspiritCalib(ksp_calib, calib_width=24, device=sp.Device(0))
-mps_estimated = app.run()
-mps_estimated = sp.to_device(mps_estimated, sp.cpu_device)
-sens_maps_expand = np.moveaxis(mps_estimated, 0, -1)[..., None, :]
-sens_maps_expand = sens_fft_bdelta_0_by_bart
+basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
 
-sense_prelim = np.zeros((*fft_bdelta_0.shape[:2], num_bvals), dtype=np.complex128)
+sense_prelim = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
 for i in range(num_bvals):
     sense_prelim[..., i] = bart(
         1, 'pics -S -l2 -r0.001 -i 10',
         fft_bdelta_0[..., i], sens_maps_expand
     )
-print('Sense prelim shape:', sense_prelim.shape)
-utils.help_show_imgs(np.abs(sense_prelim[...,:16]))
 
 _composite_sens, _ = utils.get_composite_sens(
     sense_prelim, sens_maps_expand, bvals=BVALS, visualize="True"
@@ -273,23 +305,5 @@ _, recon_fmac_basis = utils.llr_recon_with_retry(
     lambda2=0.001,
 )
 # Ensure output directory exists before writing CFL
-os.makedirs(ps.op, exist_ok=True)
-cfl.writecfl(os.path.join(ps.op, 'phan_dtd_recon_2basis'), recon_fmac_basis)
-
-# %%
-k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
-k_ngc_all_transposed = np.transpose(k_ngc_all[0,0,0,...].squeeze(), (2, 1, 0))
-print(f'k_ngc_all_transposed shape:, {k_ngc_all_transposed.shape}, dtype: {k_ngc_all_transposed.dtype}')
-print(f"is all zeros in even columns: {np.all(k_ngc_all_transposed[:,0::2] == 0)}, odd columns: {np.all(k_ngc_all_transposed[:,1::2] == 0)}")
-plot_utils.help_show_imgs(sp.fft(k_ngc_all_transposed[...,0:4]), cmap='gray')
-plt.imshow(k_ngc_all_transposed[:,1::2,0].real>1e-3, cmap='gray')
-
-mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
-k_pparef_ngc = mat_data['k_pparef_ngc_reshape']
-pparef_slc = k_pparef_ngc[:, :, :, 33]
-print(f"pparef_slc shape: {pparef_slc.shape}")
-pparef_slc = bart(1, f"cc -p{num_coils} -A -S", pparef_slc[:,:,None,:])
-mbref_embed = utils.embed_center(pparef_slc, fft_bdelta_0[..., b_idx])
-sens_fft_bdelta_0_by_bart = bart(1, "ecalib -m1", mbref_embed)
-print('Sens map shape by bart ecalib:', sens_fft_bdelta_0_by_bart.shape)
-utils.help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze())
+os.makedirs(ps.bart_p, exist_ok=True)
+cfl.writecfl(os.path.join(ps.bart_p, 'phan_dtd_recon_2basis'), recon_fmac_basis)
