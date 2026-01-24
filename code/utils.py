@@ -361,7 +361,11 @@ def get_composite_sens(data, sens_maps, bvals=None, visualize="False", title='')
 
     composite_sens = np.zeros((data.shape[0], data.shape[1], sens_maps.shape[-1], data.shape[-1]),
                               dtype=np.complex128)
-    shift_amount = int(-np.ceil(164 / (2 * 2)))
+    if visualize=="True":
+        shift_amount = 0
+    else:
+        shift_amount = int(-np.ceil(164 / (2 * 2)))
+    
     phase_estimates = np.zeros((data.shape[0], data.shape[1], num_bvals), dtype=np.complex128)
     phase_estimates = phase_estimates[...,indices]
     for i in range(data.shape[-1]):
