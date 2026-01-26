@@ -20,6 +20,8 @@
   },
   "dicom" :{
     "dicom_nii": "/data/users/cyang/DICOM_YANGCHENG/NII",
-    "STEs": "_STEs_2mmiso_PA_20260118122029_601"
+    "STEs": "_STEs_2mmiso_PA_20260118122029_601",
+    "LTE": "_LTE_2mmiso_PA_20260118122029_501",
+    "nii_gz": ".nii.gz"
   }
 }
