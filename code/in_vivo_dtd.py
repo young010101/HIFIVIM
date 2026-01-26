@@ -84,7 +84,7 @@ def simulate_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
 
 
 def save_nifti(img_data, ps, filename=None, ref_path=None, debug=False) -> None:
-    out_path=ps.op
+    out_path=ps.ip
     # affine = nib.load(ref_path).affine
     ref_path = os.path.join(args.outdir, 'Phantom_T1.nii.gz') if ref_path is None else ref_path
     
@@ -307,3 +307,15 @@ _, recon_fmac_basis = utils.llr_recon_with_retry(
 # Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
 cfl.writecfl(os.path.join(ps.bart_p, 'phan_dtd_recon_2basis'), recon_fmac_basis)
+
+save_nifti(recon_fmac_basis.squeeze()[...,None,:], ps, filename='in_vivo_dtd_recon_2basis', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+save_nifti(recon_fmac_basis.real.squeeze()[...,None,:], ps, filename='in_vivo_dtd_recon_2basis_real', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+save_nifti(np.abs(recon_fmac_basis).squeeze()[...,None,:], ps, filename='in_vivo_dtd_recon_2basis_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+
+# %%
+lte_nii_ps = os.path.join(cfg["dicom"]["dicom_nii"], cfg["dicom"]["LTE"] + cfg["dicom"]["nii_gz"])
+os.path.exists(lte_nii_ps)
+lte_nii = nib.load(lte_nii_ps)
+lte_data = lte_nii.get_fdata()
+lte_data.shape
+# %%
