@@ -23,12 +23,13 @@ def load_all_nii(directory):
 
 
 if __name__ == "__main__":
-	directory = '/data/users/cyang/repos/HIFIVIM/Phantom/phan_cyan/processed/brain'
+	directory = '/data/users/cyang/dtd_subspace/0119_ngc/processed/brain/6_STEs_2mmiso_PA'
+	# directory = '/data/users/cyang/dtd_subspace/0119_ngc/processed/brain/invivo_dtdgamma_subspace'
 	data = load_all_nii(directory)
 	for k, v in data.items():
 		print(f"{k}: shape={v.shape}, dtype={v.dtype}")
 	prefix = "dtd_gamma_"
-	prefix = "dtd_codivide_"
+	# prefix = "dtd_codivide_"
 	# collect dtd_gamma_ images
 	dtd_items = [(k, v) for k, v in data.items() if k.startswith(prefix)]
 	n = len(dtd_items)
