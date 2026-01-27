@@ -319,3 +319,30 @@ lte_nii = nib.load(lte_nii_ps)
 lte_data = lte_nii.get_fdata()
 lte_data.shape
 # %%
+order = np.argsort(BVALS)
+img_basis2_sorted =recon_fmac_basis[..., order]
+bvals_sort = BVALS[order]
+
+stes_nii_ps = os.path.join(cfg["dicom"]["dicom_nii"], cfg["dicom"]["STEs"] + cfg["dicom"]["nii_gz"])
+if debug_level >= 1:
+    os.path.exists(stes_nii_ps)
+stes_nii = nib.load(stes_nii_ps)
+stes_data = stes_nii.get_fdata()
+if debug_level >= 1:
+    # plt.imshow(stes_data[:,:,36,0])
+    plt.plot(stes_data[50,50,36,:])
+    stes_data.dtype
+    stes_data.shape
+
+bvals_stes_dicom_ps = os.path.join(cfg["dicom"]["dicom_nii"], cfg["dicom"]["STEs"] + ".bval")
+bvals_stes_dicom = np.loadtxt(bvals_stes_dicom_ps)
+order_stes_dicom = np.argsort(bvals_stes_dicom)
+img_stes_dicom_sorted = stes_data[..., order_stes_dicom]
+
+
+if debug_level >= 1:
+    line_stes_dicom = img_stes_dicom_sorted[50,50,36,:]
+    plt.plot(line_stes_dicom)
+    line_basis2_ = img_basis2_sorted.real.squeeze()[50,50,:]
+    plt.plot(line_basis2_ / line_basis2_.max() * line_stes_dicom.max())
+# %%
