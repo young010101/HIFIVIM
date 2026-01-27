@@ -23,8 +23,17 @@ def load_all_nii(directory):
 
 
 if __name__ == "__main__":
-	directory = '/data/users/cyang/dtd_subspace/0119_ngc/processed/brain/6_STEs_2mmiso_PA'
-	# directory = '/data/users/cyang/dtd_subspace/0119_ngc/processed/brain/invivo_dtdgamma_subspace'
+	methods = [
+		"6_STEs_2mmiso_PA",
+		"invivo_dtdgamma_subspace_gold",
+		"invivo_dtdgamma_tran_gold",
+		"invivo_dtdgamma_subspace",
+		"invivo_dtdgamma_tran_stes_4b",
+		"invivo_dtdgamma_tran_stes_full",
+		"invivo_dtdgamma_tran2",
+	]
+	directory_root = '/data/users/cyang/dtd_subspace/0119_ngc/processed/brain'
+	directory = os.path.join(directory_root, methods[1])
 	data = load_all_nii(directory)
 	for k, v in data.items():
 		print(f"{k}: shape={v.shape}, dtype={v.dtype}")
@@ -48,7 +57,12 @@ if __name__ == "__main__":
 			img2d = v[:, :, 0]
 		else:
 			img2d = v
-		im = ax.imshow(img2d, cmap=cmap)
+		if "MK" in k.upper():
+			im = ax.imshow(img2d, cmap=cmap, vmin=0, vmax=10)
+		elif "ciso" in k:
+			im = ax.imshow(img2d, cmap=cmap, vmin=0, vmax=3)
+		else:
+			im = ax.imshow(img2d, cmap=cmap)
 		ax.set_title(k, fontsize=20)
 		ax.axis("off")
 		fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
