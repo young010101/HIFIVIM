@@ -2,7 +2,8 @@
   "paths": {
     "base": "/data/users/cyang/dtd_subspace/0119_ngc",
     "tmp_rel": "tmp",
-    "raw_stes": "/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA"
+    "raw_stes": "/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA",
+    "raw_lte": "/data/users/cyang/RAWDATA_YANGCHENG/5_LTE_2mmiso_PA"
   },
   "dataset": {
     "type": "brain",
@@ -21,7 +22,7 @@
   "dicom" :{
     "dicom_nii": "/data/users/cyang/DICOM_YANGCHENG/NII",
     "STEs": "_STEs_2mmiso_PA_20260118122029_601",
-    "STE": "_STE_2mmiso_PA_20260118122029_401",
+    "STE":"_STE_2mmiso_PA_20260118122029_401",
     "LTE": "_LTE_2mmiso_PA_20260118122029_501",
     "nii_gz": ".nii.gz"
   }
