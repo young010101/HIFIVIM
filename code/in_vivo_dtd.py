@@ -83,10 +83,12 @@ def simulate_coil_ksp(img_xyb, num_coils=16, device=sp.cpu_device):
     return ksp, mps_cxy
 
 
-def save_nifti(img_data, ps, filename=None, ref_path=None, debug=False) -> None:
+def save_nifti(img_data, ps, filename=None, ref_path=None, debug_level=0) -> None:
     out_path=ps.ip
     # affine = nib.load(ref_path).affine
     ref_path = os.path.join(args.outdir, 'Phantom_T1.nii.gz') if ref_path is None else ref_path
+    if debug_level >= 1:
+        print(f"Reference path for NIfTI affine: {ref_path}")
     
     affine = nib.load(ref_path).affine 
     img = nib.Nifti1Image(img_data, affine)
@@ -102,7 +104,7 @@ def save_nifti(img_data, ps, filename=None, ref_path=None, debug=False) -> None:
     bvecs[0, :] = 1  # x direction
     np.savetxt(os.path.join(out_path, f'{filename}.bvec'), bvecs, fmt='%d', delimiter=' ')
 
-    if debug:
+    if debug_level >= 1:
         print(os.listdir(out_path))
 
 def apply_effects(img_xyb, add_phase=False, add_noise=False, noise_sigma=20, show=False):
@@ -314,15 +316,28 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     )
     return recon_fmac_basis
 
-recon_fmac_basis = run_pipeline_invivo(k[:,:, 0:1,:,:], k_pparef[:,:, 0:1,:], basis)
+
+num_x, num_y, num_z, num_c, num_b = k.shape
+recon_fmac_basis = np.zeros((num_x, num_y, num_z, 1, 1, num_b), dtype=np.complex128)
+for slc in tqdm(range(num_z)):
+    tmp = run_pipeline_invivo(k[:,:, slc:slc+1,:,:], k_pparef[:,:, slc:slc+1,:], basis)
+    recon_fmac_basis[:,:,slc:slc+1,:,:,:] = tmp
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
 filename_pref = "stes_2basis"
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
 
-save_nifti(recon_fmac_basis.squeeze()[...,None,:], ps, filename=filename_pref, ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
-save_nifti(recon_fmac_basis.real.squeeze()[...,None,:], ps, filename=filename_pref + '_real', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
-save_nifti(np.abs(recon_fmac_basis).squeeze()[...,None,:], ps, filename=filename_pref + '_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+save_nifti(recon_fmac_basis.squeeze(), ps, filename=filename_pref, ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(recon_fmac_basis.real.squeeze(), ps, filename=filename_pref + '_real', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(np.abs(recon_fmac_basis).squeeze(), ps, filename=filename_pref + '_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+
+stes_ref = os.path.join(ps.ip, "_STEs_2mmiso_PA_20260118122029_601_slc34.nii.gz")
+
+recon_fmac_basis2_rot180 = np.rot90(recon_fmac_basis.squeeze(), k=2, axes=(0,1))
+save_nifti(recon_fmac_basis2_rot180, ps, filename=filename_pref + '_rot180', ref_path=stes_ref, debug_level=1)
+
+recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180 * 1759 / np.max(recon_fmac_basis2_rot180.real)
+save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm', ref_path=stes_ref, debug_level=1)
 
 # %%
 lte_nii_ps = os.path.join(cfg["dicom"]["dicom_nii"], cfg["dicom"]["LTE"] + cfg["dicom"]["nii_gz"])
