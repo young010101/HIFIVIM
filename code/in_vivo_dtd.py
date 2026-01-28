@@ -336,7 +336,7 @@ stes_ref = os.path.join(ps.ip, "_STEs_2mmiso_PA_20260118122029_601_slc34.nii.gz"
 recon_fmac_basis2_rot180 = np.rot90(recon_fmac_basis.squeeze(), k=2, axes=(0,1))
 save_nifti(recon_fmac_basis2_rot180, ps, filename=filename_pref + '_rot180', ref_path=stes_ref, debug_level=1)
 
-recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180 * 1759 / np.max(recon_fmac_basis2_rot180.real)
+recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180.real * 1759 / np.max(recon_fmac_basis2_rot180.real)
 save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm', ref_path=stes_ref, debug_level=1)
 
 # %%
