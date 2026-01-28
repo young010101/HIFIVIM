@@ -10,11 +10,11 @@
     "protocol": "6_STEs_2mmiso_PA"
   },
   "layout": {
-    "input_rel": "DATA/{type}/{protocol}/NII",
-    "nii_rel": "DATA/{type}/{protocol}/NII",
-    "mat_rel": "DATA/{type}/{protocol}/MAT",
-    "bart_rel": "DATA/{type}/{protocol}/BART",
-    "output_rel": "processed/{type}/{protocol}"
+    "input_rel": "DATA/{type}/NII",
+    "nii_rel": "DATA/{type}/NII",
+    "mat_rel": "DATA/{type}/MAT",
+    "bart_rel": "DATA/{type}/BART",
+    "output_rel": "processed/{type}"
   },
   "debug": {
     "level": 1

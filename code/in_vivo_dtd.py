@@ -35,7 +35,7 @@ protocol = cfg["dataset"]["protocol"]
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):
-    return rel_tmpl.format(type=typ, protocol=protocol)
+    return rel_tmpl.format(type=typ)
 
 print(f"Processing {typ} data with protocol {protocol}...")
 # %%
@@ -324,7 +324,7 @@ for slc in tqdm(range(num_z)):
     recon_fmac_basis[:,:,slc:slc+1,:,:,:] = tmp
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
-filename_pref = "stes_2basis"
+filename_pref = protocol + "_2basis"
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
 
 save_nifti(recon_fmac_basis.squeeze(), ps, filename=filename_pref, ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
