@@ -257,17 +257,19 @@ def get_sens_by(k, acs):
     return sens_fft_bdelta_0_by_bart
 # %%
 k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
-k = np.transpose(k_ngc_all[:,0,0,...].squeeze(), (3, 2, 1, 0))[:,:,None,:,:]
+if debug_level >= 1:
+    print('k_ngc_all shape:', k_ngc_all.shape)  # (Nb, 1, Nz, Nc, Ny, Nx)
+k = np.transpose(k_ngc_all[:,0,0:2,...].squeeze(), (4, 3, 1, 2, 0)) # Nx, Ny, Nz, Nc, Nb
 
 mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
-k_pparef = mat_data['k_pparef_ngc_reshape'][:, :, :, 33][:,:,None,:]
+k_pparef = np.transpose(mat_data['k_pparef_ngc_reshape'][:, :, :, 33:35], (0,1,3,2))  # Nx, Ny, Nz, Nc
 
-num_x, num_y, num_z, num_c, num_b = k.shape
-recon_demo = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
+# num_x, num_y, num_z, num_c, num_b = k.shape
+# recon_demo = np.zeros((num_x, num_y, num_z, num_b), dtype=np.complex128)
 # for b in tqdm(range(10,num_b)):
 #     recon_demo[..., b] = in_vivo_pipe(k[..., b], k_pparef, num_coils=16) 
 
-plot_utils.help_show_imgs(np.abs(recon_demo[...,:16]), cmap='gray')
+# plot_utils.help_show_imgs(np.abs(recon_demo[:,:,1,:16]), cmap='gray')
 
 # with multiprocessing.Pool() as pool:
 #     results = pool.starmap(in_vivo_pipe, [(k[..., b], k_pparef) for b in range(num_b)])
@@ -275,42 +277,52 @@ plot_utils.help_show_imgs(np.abs(recon_demo[...,:16]), cmap='gray')
 #         recon_demo[..., b] = result
 
 # %%
-fft_bdelta_0 = k
-sens_maps_expand = get_sens_by(fft_bdelta_0[..., 0], k_pparef)
 
 basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
 
-sense_prelim = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
-for i in range(num_bvals):
-    sense_prelim[..., i] = bart(
-        1, 'pics -S -l2 -r0.001 -i 10',
-        fft_bdelta_0[..., i], sens_maps_expand
+# %%
+def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
+    fft_bdelta_0 = k_slc
+    sens_maps_expand = get_sens_by(fft_bdelta_0[..., 0], k_pparef_slc)  # use first b=0 for sens est
+    num_x, num_y, num_z, num_c, num_b = k_slc.shape
+    sense_prelim = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
+
+    if num_b != basis.shape[-2]:
+        raise ValueError(f"Number of bvals in k-space ({num_b}) does not match basis ({num_bvals})")
+    for i in range(num_b):
+        sense_prelim[..., i] = bart(
+            1, 'pics -S -l2 -r0.001 -i 10',
+            fft_bdelta_0[..., i], sens_maps_expand
+        )
+
+    _composite_sens, _ = utils.get_composite_sens(
+        sense_prelim, sens_maps_expand, bvals=BVALS, visualize="True"
+    )
+    composite_sens = np.expand_dims(
+        np.transpose(_composite_sens, (0, 1, 4, 2, 3)), axis=4
     )
 
-_composite_sens, _ = utils.get_composite_sens(
-    sense_prelim, sens_maps_expand, bvals=BVALS, visualize="True"
-)
-composite_sens = np.expand_dims(
-    np.transpose(_composite_sens, (0, 1, 4, 2, 3)), axis=4
-)
+    fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)
+    basis2 = basis[..., :2]
+    _, recon_fmac_basis = utils.llr_recon_with_retry(
+        fft_bdelta_0_expand,
+        composite_sens,
+        basis2,
+        use_basis=True,
+        lambda1=0.001,
+        lambda2=0.001,
+    )
+    return recon_fmac_basis
 
-fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)
-basis2 = basis[..., :2]
-_, recon_fmac_basis = utils.llr_recon_with_retry(
-    fft_bdelta_0_expand,
-    composite_sens,
-    basis2,
-    use_basis=True,
-    lambda1=0.001,
-    lambda2=0.001,
-)
-# Ensure output directory exists before writing CFL
+recon_fmac_basis = run_pipeline_invivo(k[:,:, 0:1,:,:], k_pparef[:,:, 0:1,:], basis)
+#%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
-cfl.writecfl(os.path.join(ps.bart_p, 'phan_dtd_recon_2basis'), recon_fmac_basis)
+filename_pref = "stes_2basis"
+cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
 
-save_nifti(recon_fmac_basis.squeeze()[...,None,:], ps, filename='in_vivo_dtd_recon_2basis', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
-save_nifti(recon_fmac_basis.real.squeeze()[...,None,:], ps, filename='in_vivo_dtd_recon_2basis_real', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
-save_nifti(np.abs(recon_fmac_basis).squeeze()[...,None,:], ps, filename='in_vivo_dtd_recon_2basis_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+save_nifti(recon_fmac_basis.squeeze()[...,None,:], ps, filename=filename_pref, ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+save_nifti(recon_fmac_basis.real.squeeze()[...,None,:], ps, filename=filename_pref + '_real', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
+save_nifti(np.abs(recon_fmac_basis).squeeze()[...,None,:], ps, filename=filename_pref + '_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug=True)
 
 # %%
 lte_nii_ps = os.path.join(cfg["dicom"]["dicom_nii"], cfg["dicom"]["LTE"] + cfg["dicom"]["nii_gz"])
