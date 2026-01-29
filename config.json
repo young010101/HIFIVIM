@@ -29,5 +29,18 @@
   "UIDnumber": {
     "lte":"5_LTE_2mmiso_PA",
     "stes":"6_STEs_2mmiso_PA"
+  },
+  "naming": {
+    "template": "{prefix}{recon_method}{sub1}{sub2}{sub3}{sub4}",
+    "recon_method": {
+      "grappa_suffix": "_grappa",
+      "sense_suffix": "_sense",
+      "basis_suffix": "_{num_basis}basis"
+    },
+    "sub1": "_{num_b}b_{num_b}rep",
+    "sub2": ["real", "abs", "complex"],
+    "sub3": ["norm", "nonorm"],
+    "sub4": ["rot0", "rot180"],
+    "sub5": ["registered", "nonregistered"]
   }
 }

@@ -31,9 +31,11 @@ if __name__ == "__main__":
 		"invivo_dtdgamma_tran_stes_4b",
 		"invivo_dtdgamma_tran_stes_full",
 		"invivo_dtdgamma_tran2",
+		"brain/grappa",
+		"brain/dicom"
 	]
-	directory_root = '/data/users/cyang/dtd_subspace/0119_ngc/processed/brain'
-	directory = os.path.join(directory_root, methods[1])
+	directory_root = '/data/users/cyang/dtd_subspace/0119_ngc/processed/'
+	directory = os.path.join(directory_root, methods[8])
 	data = load_all_nii(directory)
 	for k, v in data.items():
 		print(f"{k}: shape={v.shape}, dtype={v.dtype}")
