@@ -18,7 +18,7 @@ with open("../config.json", "r") as f:
 
 base = cfg["paths"]["base"]
 typ = cfg["dataset"]["type"]
-protocol = cfg["UIDnumber"]["stes"]
+protocol = cfg["UIDnumber"]["lte"]
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):

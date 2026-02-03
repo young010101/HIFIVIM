@@ -42,6 +42,8 @@ if __name__ == "__main__":
 		"brain/grappa",
 		"brain/grappa_rot180_norm_removeb0_stes_basis4_real_removeb0_bak",
   		"brain/lte_grappa_rot180_norm_removeb0stes_grappa_real_removeb0_bak",
+		"brain/lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
+		"brain/lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0"
 	]
 	directory_root = '/data/users/cyang/dtd_subspace/0119_ngc/processed/'
 	directory = os.path.join(directory_root, methods[-1])
