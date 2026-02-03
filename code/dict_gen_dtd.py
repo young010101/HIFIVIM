@@ -100,7 +100,7 @@ def timeit(func):
     
 
 @timeit
-def generate_dictionary(bvals = BVALS):
+def generate_dictionary(bvals = BVALS, b_delta=0):
     """generate dictionary
 
     Args:
@@ -116,7 +116,12 @@ def generate_dictionary(bvals = BVALS):
     args2 = [(s0, D, Dstar, mu2a, bvals, i) for i, (D, Dstar, mu2a) in enumerate(itertools.product(d_iso, mu2_iso, mu2_aniso))]
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
         # Use b_delta = 1 (tensor anisotropy) version of the model
-        results = pool.starmap(get_dicc2, args2)
+        if b_delta == 1:
+            print("Using b_delta = 1 for dictionary generation.")
+            results = pool.starmap(get_dicc2, args2)
+        else:
+            print("Using b_delta = 0 for dictionary generation.")
+            results = pool.starmap(get_dicc, args2)
         pool.close()
         pool.join()
         results = np.asarray(results, dtype=object)
@@ -148,12 +153,12 @@ def extract_basis_set(ivim_dicc, num_basis, debug=False, bvals=BVALS):
 
 
 @timeit
-def basis_pipeline(num_basis, bvals, outdir=None, debug=False):
-    ivim_dicc = generate_dictionary(bvals=bvals)
+def basis_pipeline(num_basis, bvals, outdir=None, b_delta=0, debug=False):
+    ivim_dicc = generate_dictionary(bvals=bvals, b_delta=b_delta)
     basis, _S1 = extract_basis_set(ivim_dicc, num_basis,bvals=bvals, debug=debug) 
     if outdir is not None:
         cfl.writecfl(os.path.join(outdir, 'dtd_bdelta1_basis_{}'.format(num_basis)), (basis))
-    return basis
+    return ivim_dicc, basis
 
 
 def _plot_S1(ax, S1):

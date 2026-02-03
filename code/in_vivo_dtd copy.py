@@ -31,7 +31,8 @@ with open("../config.json", "r") as f:
 
 base = cfg["paths"]["base"]
 typ = cfg["dataset"]["type"]
-protocol = cfg["dataset"]["protocol"]
+# protocol = cfg["dataset"]["protocol"]
+protocol = cfg["UIDnumber"]["stes"]
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):
@@ -54,7 +55,8 @@ if debug_level >= 1:
     print(ps.mat_p)
     print(ps.bart_p)
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
-bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
+# bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
+bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/" + protocol, "bval.bval"))
 BVALS = bval
 num_bvals = len(BVALS)
 
@@ -91,6 +93,8 @@ def save_nifti(img_data, ps, filename=None, ref_path=None, debug_level=0) -> Non
         print(f"Reference path for NIfTI affine: {ref_path}")
     
     affine = nib.load(ref_path).affine 
+    if debug_level >= 1:
+        print(f"Affine matrix:\n{affine}")
     img = nib.Nifti1Image(img_data, affine)
 
     if not os.path.exists(out_path):
@@ -258,12 +262,15 @@ def get_sens_by(k, acs):
 
     return sens_fft_bdelta_0_by_bart
 # %%
-k_ngc_all = load_cell_array(os.path.join(ps.mat_p, "k_ngc_all.mat"), "k_ngc_all")
+# pref = "stes_2mmiso_pa_"
+pref = protocol + "_" 
+k_ngc_all = load_cell_array(os.path.join(ps.mat_p, pref+"k_ngc_all.mat"), "k_ngc_all")
 if debug_level >= 1:
+    print(f"Using protocol: {protocol}")
     print('k_ngc_all shape:', k_ngc_all.shape)  # (Nb, 1, Nz, Nc, Ny, Nx)
 k = np.transpose(k_ngc_all[:,0,0:2,...].squeeze(), (4, 3, 1, 2, 0)) # Nx, Ny, Nz, Nc, Nb
 
-mat_data = loadmat(os.path.join(ps.mat_p, "ngc_slice_grappa_data.mat"))
+mat_data = loadmat(os.path.join(ps.mat_p, pref + "ngc_slice_grappa_data.mat"))
 k_pparef = np.transpose(mat_data['k_pparef_ngc_reshape'][:, :, :, 33:35], (0,1,3,2))  # Nx, Ny, Nz, Nc
 
 # num_x, num_y, num_z, num_c, num_b = k.shape
@@ -279,10 +286,11 @@ k_pparef = np.transpose(mat_data['k_pparef_ngc_reshape'][:, :, :, 33:35], (0,1,3
 #         recon_demo[..., b] = result
 
 # %%
-
-basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, debug=True)
+b_delta = 0
+ivim_dicc, basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=20, b_delta=b_delta, debug=True)
 
 # %%
+num_basis = 4
 def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     fft_bdelta_0 = k_slc
     sens_maps_expand = get_sens_by(fft_bdelta_0[..., 0], k_pparef_slc)  # use first b=0 for sens est
@@ -291,9 +299,11 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
 
     if num_b != basis.shape[-2]:
         raise ValueError(f"Number of bvals in k-space ({num_b}) does not match basis ({num_bvals})")
+    pics_cmd = 'pics -e -d 5 -i 100 -S -R L:3:3:0.001 -R W:3:0:0.001'
+    pics_cmd = 'pics -S -l2 -r0.001 -i 10'
     for i in range(num_b):
         sense_prelim[..., i] = bart(
-            1, 'pics -S -l2 -r0.001 -i 10',
+            1, pics_cmd,
             fft_bdelta_0[..., i], sens_maps_expand
         )
 
@@ -305,8 +315,8 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     )
 
     fft_bdelta_0_expand = np.expand_dims(fft_bdelta_0, axis=4)
-    basis2 = basis[..., :2]
-    _, recon_fmac_basis = utils.llr_recon_with_retry(
+    basis2 = basis[..., :num_basis]
+    recon, recon_fmac_basis = utils.llr_recon_with_retry(
         fft_bdelta_0_expand,
         composite_sens,
         basis2,
@@ -314,18 +324,29 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
         lambda1=0.001,
         lambda2=0.001,
     )
-    return recon_fmac_basis
+    return recon_fmac_basis, recon, sense_prelim[:,:,None, :]
 
 
 num_x, num_y, num_z, num_c, num_b = k.shape
 recon_fmac_basis = np.zeros((num_x, num_y, num_z, 1, 1, num_b), dtype=np.complex128)
+recons = np.zeros((num_x, num_y, num_z,1, 1, 1, num_basis), dtype=np.complex128)
+sense_prelim_all = np.zeros((num_x, num_y, num_z, num_b), dtype=np.complex128)
 for slc in tqdm(range(num_z)):
-    tmp = run_pipeline_invivo(k[:,:, slc:slc+1,:,:], k_pparef[:,:, slc:slc+1,:], basis)
+    tmp, recon, sense_prelim = run_pipeline_invivo(k[:,:, slc:slc+1,:,:], k_pparef[:,:, slc:slc+1,:], basis)
     recon_fmac_basis[:,:,slc:slc+1,:,:,:] = tmp
+    recons[:,:,slc:slc+1,:,:,:] = recon
+    sense_prelim_all[:,:,slc:slc+1,:] = sense_prelim
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
-filename_pref = protocol + "_2basis"
+filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}_bak2"
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
+
+save_nifti(recons.squeeze(), ps, filename=filename_pref + '_coef', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(sense_prelim_all.squeeze(), ps, filename=filename_pref + '_sense_prelim', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(sense_prelim_all.squeeze().real, ps, filename=filename_pref + '_sense_prelim_real', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(np.abs(sense_prelim_all.squeeze()), ps, filename=filename_pref + '_sense_prelim_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+b0 = np.abs(sense_prelim_all.squeeze())[..., 0] + 1e-8  # avoid div by zero
+save_nifti(np.abs(sense_prelim_all.squeeze()) / b0[..., None], ps, filename=filename_pref + '_sense_prelim_abs_removeb0', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
 
 save_nifti(recon_fmac_basis.squeeze(), ps, filename=filename_pref, ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
 save_nifti(recon_fmac_basis.real.squeeze(), ps, filename=filename_pref + '_real', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
@@ -336,8 +357,22 @@ stes_ref = os.path.join(ps.ip, "_STEs_2mmiso_PA_20260118122029_601_slc34.nii.gz"
 recon_fmac_basis2_rot180 = np.rot90(recon_fmac_basis.squeeze(), k=2, axes=(0,1))
 save_nifti(recon_fmac_basis2_rot180, ps, filename=filename_pref + '_rot180', ref_path=stes_ref, debug_level=1)
 
-recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180.real * 1759 / np.max(recon_fmac_basis2_rot180.real)
-save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm', ref_path=stes_ref, debug_level=1)
+recon_fmac_basis2_rot180_norm1759 = np.abs(recon_fmac_basis2_rot180) * 1759 / np.max(recon_fmac_basis2_rot180.real)
+save_nifti(recon_fmac_basis2_rot180_norm1759, ps, filename=filename_pref + '_rot180_norm1759'+'_abs', ref_path=stes_ref, debug_level=1)
+recon_fmac_basis2_rot180_norm1759 =  recon_fmac_basis2_rot180.real * 1759 / np.max(recon_fmac_basis2_rot180.real)
+save_nifti(recon_fmac_basis2_rot180_norm1759, ps, filename=filename_pref + '_rot180_norm1759' + '_real', ref_path=stes_ref, debug_level=1)
+
+recon_fmac_basis2_rot180_norm = np.abs(recon_fmac_basis2_rot180) / np.max(recon_fmac_basis2_rot180.real)
+save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm'+'_abs', ref_path=stes_ref, debug_level=1)
+recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180.real / np.max(recon_fmac_basis2_rot180.real)
+save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm' + '_real', ref_path=stes_ref, debug_level=1)
+
+b0 = recon_fmac_basis2_rot180[..., 0] + 1e-8  # avoid div by zero
+recon_fmac_basis2_rot180_norm_removeb0 = np.abs(recon_fmac_basis2_rot180) / b0[..., None] 
+save_nifti(recon_fmac_basis2_rot180_norm_removeb0, ps, filename=filename_pref + '_rot180_norm'+'_abs_removeb0', ref_path=stes_ref, debug_level=1)
+b0 = recon_fmac_basis2_rot180[..., 0].real + 1e-8  # avoid div by zero
+recon_fmac_basis2_rot180_norm_removeb0 =  recon_fmac_basis2_rot180.real / b0[..., None] 
+save_nifti(recon_fmac_basis2_rot180_norm_removeb0, ps, filename=filename_pref + '_rot180_norm' + '_real_removeb0', ref_path=stes_ref, debug_level=1)
 
 # %%
 lte_nii_ps = os.path.join(cfg["dicom"]["dicom_nii"], cfg["dicom"]["LTE"] + cfg["dicom"]["nii_gz"])
@@ -374,8 +409,11 @@ if debug_level >= 1:
     plt.plot(line_basis2_ / line_basis2_.max() * line_stes_dicom.max())
 # %%
 fn_template =cfg["naming"]["template"]
-one_name = fn_template.format(prefix=
+# one_name = fn_template.format(prefix=
 #   {prefix}{recon_method}{b_rep}{dtype}{is_norm}{rotation}{is_reg}
 # %%
 cfg
+# %%
+plt.plot(recon_fmac_basis.real.squeeze()[50,50,0,:])
+plt.plot(np.abs(sense_prelim_all)[50,50,0,:])
 # %%

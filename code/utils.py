@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
 from skimage.metrics import structural_similarity as ssim
 import os
+from pathlib import Path
 try:
     from bart import bart
 except ModuleNotFoundError:
@@ -56,6 +57,12 @@ Functions for model-based IVIM/IVIM-LLR
 
 BVALS = np.asarray([0, 5, 7, 10, 15, 20, 30, 40, 50, 60, 100, 200, 400, 700, 1000])
 
+def tmp(ps):
+    p = Path(os.path.join(ps.nii_p, '4_STE_2mmiso_PA_2basis_bdelta0_rot180_norm_real_removeb0_pa.nii.gz'))
+    # %%
+    print(p.parent)
+    print(p.stem)
+    print(p.suffixes)
 
 def pipe(mbref_slc_bart, debug=True):
     # todo use original

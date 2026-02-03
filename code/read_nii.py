@@ -31,12 +31,22 @@ if __name__ == "__main__":
 		"invivo_dtdgamma_tran_stes_4b",
 		"invivo_dtdgamma_tran_stes_full",
 		"invivo_dtdgamma_tran2",
+		"brain/grappa_rot180_norm_removeb0_ste_basis2_removeb0",
+		"brain/grappa_rot180_norm_removeb0_grappa_removeb0_ste",
+		"brain/grappa_rot180_norm_removeb0_ste_basis20_removeb0",
+		"brain/grappa_rot180_norm_removeb0_ste_basis20_abs_removeb0",
+		"brain/grappa_rot180_norm_myself",
+		"brain/dicom",
+		"brain/grappa_rot180_norm_removeb0_grappa_removeb0",
+		"brain/grappa_rot180_norm_removeb0_removeb0",
 		"brain/grappa",
-		"brain/dicom"
+		"brain/grappa_rot180_norm_removeb0_stes_basis4_real_removeb0_bak",
+  		"brain/lte_grappa_rot180_norm_removeb0stes_grappa_real_removeb0_bak",
 	]
 	directory_root = '/data/users/cyang/dtd_subspace/0119_ngc/processed/'
-	directory = os.path.join(directory_root, methods[8])
+	directory = os.path.join(directory_root, methods[-1])
 	data = load_all_nii(directory)
+	print(f"Loaded data from {directory}:")
 	for k, v in data.items():
 		print(f"{k}: shape={v.shape}, dtype={v.dtype}")
 	prefix = "dtd_gamma_"

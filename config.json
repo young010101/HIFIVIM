@@ -28,19 +28,20 @@
   },
   "UIDnumber": {
     "lte":"5_LTE_2mmiso_PA",
-    "stes":"6_STEs_2mmiso_PA"
+    "stes":"6_STEs_2mmiso_PA",
+    "ste": "4_STE_2mmiso_PA"
   },
   "naming": {
-    "template": "{prefix}{recon_method}{sub1}{sub2}{sub3}{sub4}",
+    "template": "{prefix}{recon_method}{b_rep}{dtype}{is_norm}{rotation}{is_reg}",
     "recon_method": {
       "grappa_suffix": "_grappa",
       "sense_suffix": "_sense",
       "basis_suffix": "_{num_basis}basis"
     },
-    "sub1": "_{num_b}b_{num_b}rep",
-    "sub2": ["real", "abs", "complex"],
-    "sub3": ["norm", "nonorm"],
-    "sub4": ["rot0", "rot180"],
-    "sub5": ["registered", "nonregistered"]
+    "b_rep": "_{num_b}b_{num_b}rep",
+    "dtype": ["real", "abs", "complex"],
+    "is_norm": ["norm", "nonorm"],
+    "rotation": ["rot0", "rot180"],
+    "is_reg": ["registered", "nonregistered"]
   }
 }
