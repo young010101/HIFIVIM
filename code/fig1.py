@@ -4,7 +4,9 @@ import numpy as np
 import nibabel as nib
 from pathlib import Path
 import mdm
+import glob
 
+# %% ======================compare reconstructions======================
 p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
 names_dict = {
     "dicom": "_STEs_2mmiso_PA_20260118122029_601_slc37_36_rot180_sorted_pa.nii.gz",
@@ -27,7 +29,6 @@ font_style = {
 }
 idx_slc = 0
 
-# %% ======================compare reconstructions======================
 # fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb), gridspec_kw={"hspace": 0, "wspace": 0})
 fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb))
 
@@ -80,9 +81,9 @@ plt.show()
 
 # %%
 names_dict = {
-    "dicom": "_STEs_2mmiso_PA_20260118122029_601_slc37_36_rot180_sorted_pa.nii.gz",
-    "grappa": "6_STEs_2mmiso_PA_grappa_gold_pa.nii.gz",
-    "sense": "6_STEs_2mmiso_PA_sense_prelim_all_abs_pa.nii.gz"
+    "sense": "6_STEs_2mmiso_PA_sense_prelim_all_abs_pa.nii.gz",
+    "4basis": "6_STEs_2mmiso_PA_4basis_bdelta0_bak_real_pa.nii.gz",
+    "4basis_only1": "6_STEs_2mmiso_PA_4basis_bdelta0_subonly1_real_pa.nii.gz",
 }
 names = names_dict.values()
 n_cols = len(names)
@@ -100,8 +101,6 @@ font_style = {
 }
 idx_slc = 0
 
-# %% ======================compare reconstructions======================
-# fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb), gridspec_kw={"hspace": 0, "wspace": 0})
 fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb))
 
 for i in range(n_cols):
@@ -125,3 +124,138 @@ for ax in axes.flatten():
 # plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 plt.savefig(f"../figs/{''.join(names_dict.keys())}.png", dpi=300)
 plt.show()
+
+# %% =====================signal decay w/o LTE======================
+points_dict = {"csf": (46, 52), "wm": (40, 40), "gm": (30, 35)}
+points = list(points_dict.values())
+num_points = len(points)
+fig, axes = plt.subplots(1, num_points+1, figsize=(6 * (num_points+1), 6))
+
+for ax, (x, y) in zip(axes[:num_points], points):
+    for i in range(n_cols):
+        imgs_rot180 = np.rot90(imgs[i], k=-1)
+        ax.plot(b_s_mm2, imgs_rot180[x, y, idx_slc, :] / imgs_rot180[x, y, idx_slc, 0], 'o-', label=list(names_dict.keys())[i])
+    ax.set_xlabel("b (s/mm$^2$)", **font_style)
+    ax.set_ylabel("Signal Intensity", **font_style)
+    ax.set_title(f"{list(points_dict.keys())[points.index((x, y))]} ({x}, {y}, 0)", **font_style)
+    ax.legend(fontsize=14) 
+
+ax = axes[-1]
+ax.imshow(imgs_rot180[:, :, idx_slc, 0], cmap="gray")
+for point in points:
+    ax.plot(point[1], point[0], 'rx', markersize=12, markeredgewidth=2, label=f"{list(points_dict.keys())[points.index(point)]}")
+    ax.annotate(f"{list(points_dict.keys())[points.index(point)]}", (point[1]+2, point[0]-2), color='red', fontsize=14, fontweight='bold')
+ax.set_title("b=0 image with ROIs", **font_style)
+ax.set_xticks([])
+ax.set_yticks([])
+plt.savefig(f"../figs/{''.join(names_dict.keys())}_decay.png", dpi=300)
+plt.show()
+
+# %%
+
+cmap='inferno'
+worth_view_dict = {
+  		"g_g": "lte_grappa_rot180_norm_removeb0stes_grappa_real_removeb0_bak",
+		"s_s": "lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
+		"s_basis4": "lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0",
+		# "s_basis4_ste": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0",
+		"s_basis20_ste": "lte_sense_rot180_norm_removeb0_ste_basis20_real_removeb0",
+		"s_basis4_stes_subonly1": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0subonly1",
+		"s_basis4_ste_subonly1": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0_subonly1_bak",
+}
+worth_view = list(worth_view_dict.values())
+directory_root = Path('/data/users/cyang/dtd_subspace/0119_ngc/processed/brain')
+dtd_items_names_dict = {'dtd_gamma_MD':(0,4), 'dtd_gamma_Va':(0, 3), 'dtd_gamma_Vi':(0, 3)}
+dtd_items_names = list(dtd_items_names_dict.keys()) 
+n_rows = len(dtd_items_names)
+names = worth_view
+n_cols = len(names)
+
+idx_slc = 0
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 6*n_rows))
+
+for i, name in enumerate(worth_view):
+    src_dir = directory_root / name
+    pattern = str(src_dir / '*.nii*')
+    j = 0
+    for fp in glob.glob(pattern):
+        f = Path(fp)
+        if any(k in f.name for k in dtd_items_names):
+            k = [k for k in dtd_items_names if k in f.name]
+            k = k[0]
+            ax = axes[j, i]
+            if j == 0:
+                ax.set_title(f"{list(worth_view_dict.keys())[i]}", **font_style)
+            if i == 0:
+                ax.set_ylabel(f"{k}", **font_style)
+            img = nib.load(f).get_fdata()
+            img = np.rot90(img, k=1)
+            vmin, vmax = dtd_items_names_dict[k]
+            im = ax.imshow(img[:, :, 0], cmap=cmap, vmin=vmin, vmax=vmax)
+            j += 1
+            fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+for ax in axes.flatten():
+    # ax.axis("off")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+plt.savefig(f"../figs/{''.join(worth_view_dict.keys())}_maps.png", dpi=300)
+plt.show()
+# %%
+
+cmap='coolwarm'
+worth_view_dict = {
+		"s_s": "lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
+		"s_basis4": "lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0",
+		# "s_basis4_ste": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0",
+		"s_basis20_ste": "lte_sense_rot180_norm_removeb0_ste_basis20_real_removeb0",
+		"s_basis4_stes_subonly1": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0subonly1",
+		"s_basis4_ste_subonly1": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0_subonly1_bak",
+  		"g_g": "lte_grappa_rot180_norm_removeb0stes_grappa_real_removeb0_bak",
+}
+worth_view = list(worth_view_dict.values())
+directory_root = Path('/data/users/cyang/dtd_subspace/0119_ngc/processed/brain')
+dtd_items_names_dict = {'dtd_gamma_MD':(-4,4), 'dtd_gamma_Va':(-3, 3), 'dtd_gamma_Vi':(-3, 3)}
+dtd_items_names = list(dtd_items_names_dict.keys()) 
+n_rows = len(dtd_items_names)
+names = worth_view
+n_cols = len(names)
+
+idx_slc = 0
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 6*n_rows))
+ps_gold = directory_root / worth_view_dict["s_s"] 
+gold_maps = {
+    "dtd_gamma_MD" : nib.load(ps_gold / "dtd_gamma_MD.nii.gz").get_fdata(),
+    "dtd_gamma_Va" : nib.load(ps_gold / "dtd_gamma_Va.nii.gz").get_fdata(),
+    "dtd_gamma_Vi" : nib.load(ps_gold / "dtd_gamma_Vi.nii.gz").get_fdata(),
+}
+for i, name in enumerate(worth_view):
+    src_dir = directory_root / name
+    pattern = str(src_dir / '*.nii*')
+    j = 0
+    for fp in glob.glob(pattern):
+        f = Path(fp)
+        if any(k in f.name for k in dtd_items_names):
+            k = [k for k in dtd_items_names if k in f.name]
+            k = k[0]
+            ax = axes[j, i]
+            if j == 0:
+                ax.set_title(f"{list(worth_view_dict.keys())[i]}", **font_style)
+            if i == 0:
+                ax.set_ylabel(f"{k}", **font_style)
+            img = nib.load(f).get_fdata()
+            img = np.rot90(img - gold_maps[k], k=1)
+            vmin, vmax = dtd_items_names_dict[k]
+            im = ax.imshow(img[:, :, 0], cmap=cmap, vmin=vmin, vmax=vmax)
+            j += 1
+            fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+for ax in axes.flatten():
+    # ax.axis("off")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+plt.savefig(f"../figs/{''.join(worth_view_dict.keys())}_maps_residuals.png", dpi=300)
+plt.show()
+# %%
