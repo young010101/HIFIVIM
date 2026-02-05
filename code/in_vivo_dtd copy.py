@@ -32,7 +32,7 @@ with open("../config.json", "r") as f:
 base = cfg["paths"]["base"]
 typ = cfg["dataset"]["type"]
 # protocol = cfg["dataset"]["protocol"]
-protocol = cfg["UIDnumber"]["stes"]
+protocol = cfg["UIDnumber"]["ste"]
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):
@@ -58,6 +58,8 @@ POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 # bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
 bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/" + protocol, "bval.bval"))
 BVALS = bval
+vals, ind = np.unique(BVALS, return_index=True)
+BVALS = BVALS[ind]
 num_bvals = len(BVALS)
 
 # %% define some useful functions
@@ -269,6 +271,7 @@ if debug_level >= 1:
     print(f"Using protocol: {protocol}")
     print('k_ngc_all shape:', k_ngc_all.shape)  # (Nb, 1, Nz, Nc, Ny, Nx)
 k = np.transpose(k_ngc_all[:,0,0:2,...].squeeze(), (4, 3, 1, 2, 0)) # Nx, Ny, Nz, Nc, Nb
+k = k[...,ind]
 
 mat_data = loadmat(os.path.join(ps.mat_p, pref + "ngc_slice_grappa_data.mat"))
 k_pparef = np.transpose(mat_data['k_pparef_ngc_reshape'][:, :, :, 33:35], (0,1,3,2))  # Nx, Ny, Nz, Nc
@@ -287,13 +290,14 @@ k_pparef = np.transpose(mat_data['k_pparef_ngc_reshape'][:, :, :, 33:35], (0,1,3
 
 # %%
 b_delta = 0
-ivim_dicc, basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=20, b_delta=b_delta, debug=True)
+ivim_dicc, basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, b_delta=b_delta, debug=True)
 
 # %%
 num_basis = 4
 def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     fft_bdelta_0 = k_slc
-    sens_maps_expand = get_sens_by(fft_bdelta_0[..., 0], k_pparef_slc)  # use first b=0 for sens est
+    Nx, Ny, Nz, Nc, Nb = fft_bdelta_0.shape
+    sens_maps_expand = get_sens_by(np.zeros((Nx, Ny, Nz, Nc)), k_pparef_slc)  # use first b=0 for sens est
     num_x, num_y, num_z, num_c, num_b = k_slc.shape
     sense_prelim = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
 
@@ -327,6 +331,7 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     return recon_fmac_basis, recon, sense_prelim[:,:,None, :]
 
 
+
 num_x, num_y, num_z, num_c, num_b = k.shape
 recon_fmac_basis = np.zeros((num_x, num_y, num_z, 1, 1, num_b), dtype=np.complex128)
 recons = np.zeros((num_x, num_y, num_z,1, 1, 1, num_basis), dtype=np.complex128)
@@ -338,7 +343,7 @@ for slc in tqdm(range(num_z)):
     sense_prelim_all[:,:,slc:slc+1,:] = sense_prelim
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
-filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}_bak2"
+filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}_subonly1"
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
 
 save_nifti(recons.squeeze(), ps, filename=filename_pref + '_coef', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
@@ -417,3 +422,4 @@ cfg
 plt.plot(recon_fmac_basis.real.squeeze()[50,50,0,:])
 plt.plot(np.abs(sense_prelim_all)[50,50,0,:])
 # %%
+vals, ind = np.unique(BVALS, return_index=True)

@@ -1,0 +1,127 @@
+# %%
+import matplotlib.pyplot as plt
+import numpy as np
+import nibabel as nib
+from pathlib import Path
+import mdm
+
+p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
+names_dict = {
+    "dicom": "_STEs_2mmiso_PA_20260118122029_601_slc37_36_rot180_sorted_pa.nii.gz",
+    "grappa": "6_STEs_2mmiso_PA_grappa_gold_pa.nii.gz",
+    "sense": "6_STEs_2mmiso_PA_sense_prelim_all_abs_pa.nii.gz"
+}
+names = names_dict.values()
+n_cols = len(names)
+
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+# b_s_mm2 = [1000, 2000]
+b_s_mm2 = ss[0].xps.b / 10**6
+Nb = len(b_s_mm2)
+
+font_style = {
+    "fontsize": 16,
+    "fontweight": "bold",
+}
+idx_slc = 0
+
+# %% ======================compare reconstructions======================
+# fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb), gridspec_kw={"hspace": 0, "wspace": 0})
+fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb))
+
+for i in range(n_cols):
+    for j in range(Nb):
+        ax = axes[j, i]
+        idx = np.where(np.isclose(ss[i].xps.b, b_s_mm2[j] * 10**6))[0][0]
+        im = ax.imshow(np.rot90(imgs[i][:, :, idx_slc, idx], k=-1), cmap="gray")
+        plt.colorbar(im)
+        if j == 0:
+            ax.set_title(f"{list(names_dict.keys())[i]}", pad=12, **font_style)
+        if i == 0:
+            ax.set_ylabel(f"b = {b_s_mm2[j]:.0f} s/mm$^2$", **font_style)
+
+# axes[0, 0].set_ylabel("Magnitude ($I_0$)", **font_style)
+
+for ax in axes.flatten():
+    # ax.axis("off")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+# plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+plt.savefig(f"../figs/{''.join(names_dict.keys())}.png", dpi=300)
+plt.show()
+# %% =====================signal decay w/o LTE======================
+points_dict = {"csf": (46, 52), "wm": (40, 40), "gm": (30, 35)}
+points = list(points_dict.values())
+num_points = len(points)
+fig, axes = plt.subplots(1, num_points+1, figsize=(6 * (num_points+1), 6))
+
+for ax, (x, y) in zip(axes[:num_points], points):
+    for i in range(n_cols):
+        imgs_rot180 = np.rot90(imgs[i], k=-1)
+        ax.plot(b_s_mm2, imgs_rot180[x, y, idx_slc, :] / imgs_rot180[x, y, idx_slc, 0], 'o-', label=list(names_dict.keys())[i])
+    ax.set_xlabel("b (s/mm$^2$)", **font_style)
+    ax.set_ylabel("Signal Intensity", **font_style)
+    ax.set_title(f"{list(points_dict.keys())[points.index((x, y))]} ({x}, {y}, 0)", **font_style)
+    ax.legend(fontsize=14) 
+
+ax = axes[-1]
+ax.imshow(imgs_rot180[:, :, idx_slc, 0], cmap="gray")
+for point in points:
+    ax.plot(point[1], point[0], 'rx', markersize=12, markeredgewidth=2, label=f"{list(points_dict.keys())[points.index(point)]}")
+    ax.annotate(f"{list(points_dict.keys())[points.index(point)]}", (point[1]+2, point[0]-2), color='red', fontsize=14, fontweight='bold')
+ax.set_title("b=0 image with ROIs", **font_style)
+ax.set_xticks([])
+ax.set_yticks([])
+plt.savefig(f"../figs/{''.join(names_dict.keys())}_decay.png", dpi=300)
+plt.show()
+
+# %%
+names_dict = {
+    "dicom": "_STEs_2mmiso_PA_20260118122029_601_slc37_36_rot180_sorted_pa.nii.gz",
+    "grappa": "6_STEs_2mmiso_PA_grappa_gold_pa.nii.gz",
+    "sense": "6_STEs_2mmiso_PA_sense_prelim_all_abs_pa.nii.gz"
+}
+names = names_dict.values()
+n_cols = len(names)
+
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+# b_s_mm2 = [1000, 2000]
+b_s_mm2 = ss[0].xps.b / 10**6
+Nb = len(b_s_mm2)
+
+font_style = {
+    "fontsize": 16,
+    "fontweight": "bold",
+}
+idx_slc = 0
+
+# %% ======================compare reconstructions======================
+# fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb), gridspec_kw={"hspace": 0, "wspace": 0})
+fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb))
+
+for i in range(n_cols):
+    for j in range(Nb):
+        ax = axes[j, i]
+        idx = np.where(np.isclose(ss[i].xps.b, b_s_mm2[j] * 10**6))[0][0]
+        im = ax.imshow(np.rot90(imgs[i][:, :, idx_slc, idx], k=-1), cmap="gray")
+        plt.colorbar(im)
+        if j == 0:
+            ax.set_title(f"{list(names_dict.keys())[i]}", pad=12, **font_style)
+        if i == 0:
+            ax.set_ylabel(f"b = {b_s_mm2[j]:.0f} s/mm$^2$", **font_style)
+
+# axes[0, 0].set_ylabel("Magnitude ($I_0$)", **font_style)
+
+for ax in axes.flatten():
+    # ax.axis("off")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+# plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+plt.savefig(f"../figs/{''.join(names_dict.keys())}.png", dpi=300)
+plt.show()

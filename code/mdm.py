@@ -1,3 +1,4 @@
+# %%
 import numpy as np
 from pathlib import Path
 
@@ -45,14 +46,14 @@ def mdm_xps_from_nii_fn(nii_fn, b_delta) -> XPS:
 
     if Path(xps_mat).is_file():
         import scipy.io as sio
-        xps_data = sio.loadmat(xps_mat)
+        xps_data = sio.loadmat(xps_mat, simplify_cells=True)["xps"]
         b = xps_data['b']  # in s/mm2
-        u = xps_data['u']  # unit vectors
-        u_from_bvec = xps_data.get('u_from_bvec', u)
+        u_from_bvec = xps_data['u_from_bvec']
+        u = u_from_bvec
         b_delta = xps_data['b_delta']
         xps = XPS(b, u, u_from_bvec, b_delta)
     elif Path(bval_fn).is_file() and Path(bvec_fn).is_file():
-        b = np.loadtxt(bval_fn)
+        b = np.loadtxt(bval_fn) * 10**6
         u = np.loadtxt(bvec_fn).T
         N = len(b)
         b_delta = np.asarray(b_delta).repeat(N)
@@ -82,3 +83,8 @@ if __name__ == '__main__':
     print(xps.b)
     print(xps.u)
     print(xps.b_delta)
+    xps = mdm_xps_from_nii_fn('/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII/_STEs_2mmiso_PA_20260118122029_601_slc37_36_rot180_sorted_pa.nii.gz', b_delta=0)
+    print(xps.b)
+    print(xps.u)
+    print(xps.b_delta)
+# %%

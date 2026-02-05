@@ -4,6 +4,8 @@ import numpy as np
 import glob
 import nibabel as nib
 import matplotlib.pyplot as plt
+import shutil
+from pathlib import Path
 
 
 def load_all_nii(directory):
@@ -43,12 +45,16 @@ if __name__ == "__main__":
 		"brain/grappa_rot180_norm_removeb0_stes_basis4_real_removeb0_bak",
   		"brain/lte_grappa_rot180_norm_removeb0stes_grappa_real_removeb0_bak",
 		"brain/lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
-		"brain/lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0"
+		"brain/lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0",
+		"brain/lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0",
+		"brain/lte_sense_rot180_norm_removeb0_ste_basis20_real_removeb0",
+		"brain/lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0subonly1",
+		"brain/lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0_subonly1_bak",
 	]
 	directory_root = '/data/users/cyang/dtd_subspace/0119_ngc/processed/'
-	directory = os.path.join(directory_root, methods[-1])
-	data = load_all_nii(directory)
-	print(f"Loaded data from {directory}:")
+	src_dir = os.path.join(directory_root, methods[-1])
+	data = load_all_nii(src_dir)
+	print(f"Loaded data from {src_dir}:")
 	for k, v in data.items():
 		print(f"{k}: shape={v.shape}, dtype={v.dtype}")
 	prefix = "dtd_gamma_"
@@ -85,7 +91,7 @@ if __name__ == "__main__":
 	plt.tight_layout()
 	plt.show()
 # %%
-data_phan = load_all_nii(directory)
+data_phan = load_all_nii(src_dir)
 dtd_phan_items = [(k, v) for k, v in data_phan.items() if k.startswith(prefix)]
 n = len(dtd_phan_items)
 print(f"{prefix} count: {n}")
@@ -105,4 +111,34 @@ for ax, ax2, (k, v), (k2, v2), (vmin, vmax) in zip(axes[:, 0], axes[:, 1], dtd_i
 	ax.set_title(k, fontsize=16)
 	ax.axis("off")
 	fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+# %%
+worth_view = [
+  		"lte_grappa_rot180_norm_removeb0stes_grappa_real_removeb0_bak",
+		"lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
+		"lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0",
+		"lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0",
+		"lte_sense_rot180_norm_removeb0_ste_basis20_real_removeb0",
+		"lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0subonly1",
+		"lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0_subonly1_bak",
+]
+# %%
+directory_root = Path('/data/users/cyang/dtd_subspace/0119_ngc/processed/brain')
+dtd_items_names = ['dtd_gamma_MD', 'dtd_gamma_Va', 'dtd_gamma_Vi']
+
+dst_root = directory_root / "_picked_dtd"
+dst_root.mkdir(parents=True, exist_ok=True)
+for i in worth_view:
+	src_dir = directory_root / i
+	pattern = str(src_dir / '*.nii*')
+
+	for fp in glob.glob(pattern):
+		f = Path(fp)
+		if any(k in f.name for k in dtd_items_names):
+			stem = f.name.replace('.nii.gz', '')
+			suffix = ''.join(f.suffixes)
+			dst_name = f"{stem}_{i}{suffix}"
+			dst_path = dst_root / dst_name
+
+			# print(f)
+			shutil.copy2(f, dst_path)
 # %%
