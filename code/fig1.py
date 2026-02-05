@@ -258,4 +258,48 @@ for ax in axes.flatten():
 
 plt.savefig(f"../figs/{''.join(worth_view_dict.keys())}_maps_residuals.png", dpi=300)
 plt.show()
+# %% ======================compare reconstructions======================
+p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
+names_dict = {
+    "STE_4basis_only1": "4_STE_2mmiso_PA_4basis_bdelta0_subonly1_coef.nii.gz",
+    "STEs_4basis_only1": "6_STEs_2mmiso_PA_4basis_bdelta0_subonly1_coef.nii.gz",
+    "STE_2basis_full": "4_STE_2mmiso_PA_2basis_bdelta0_bak_coef.nii.gz",
+}
+names = names_dict.values()
+n_cols = len(names)
+
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+
+font_style = {
+    "fontsize": 16,
+    "fontweight": "bold",
+}
+idx_slc = 0
+num_basis = 4
+# fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb), gridspec_kw={"hspace": 0, "wspace": 0})
+fig, axes = plt.subplots(num_basis, n_cols, figsize=(6*n_cols, 6*num_basis))
+
+for i in range(n_cols):
+    num_basis = imgs[i].shape[3]
+    for j in range(num_basis):
+        ax = axes[j, i]
+        im = ax.imshow(np.rot90(imgs[i][:, :, idx_slc, j], k=-1), cmap="gray")
+        plt.colorbar(im)
+        if j == 0:
+            ax.set_title(f"{list(names_dict.keys())[i]}", pad=12, **font_style)
+        if i == 0:
+            ax.set_ylabel(f"C$_{j+1}$", **font_style)
+
+# axes[0, 0].set_ylabel("Magnitude ($I_0$)", **font_style)
+
+for ax in axes.flatten():
+    # ax.axis("off")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+# plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+plt.savefig(f"../figs/{''.join(names_dict.keys())}_coeff.png", dpi=300)
+plt.show()
 # %%
