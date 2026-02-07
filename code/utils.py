@@ -442,7 +442,7 @@ def llr_recon_with_retry(
     R=2,
     lambda1=0.001,
     lambda2=0.001,
-    max_retries=5,
+    max_retries=15,
     delay_seconds=0.5,
 ):
     """

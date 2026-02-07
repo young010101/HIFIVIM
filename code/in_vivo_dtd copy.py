@@ -58,8 +58,14 @@ POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 # bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
 bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/" + protocol, "bval.bval"))
 BVALS = bval
-vals, ind = np.unique(BVALS, return_index=True)
+vals, _ind = np.unique(BVALS, return_index=True)
+ind = np.array([], dtype=int) 
+num_repeat = 2
+for i in range(len(vals)):
+    _idx = np.where(np.isclose(bval, vals[i]))[0][:num_repeat]
+    ind = np.append(ind, _idx)
 BVALS = BVALS[ind]
+
 num_bvals = len(BVALS)
 
 # %% define some useful functions
@@ -260,6 +266,7 @@ def in_vivo_pipe(k, acs, num_coils=None):
 def get_sens_by(k, acs):
 
     mbref_embed = utils.embed_center(acs, k)
+    # use 0.99, better
     sens_fft_bdelta_0_by_bart = bart_retry(1, "ecalib -m1", mbref_embed)
 
     return sens_fft_bdelta_0_by_bart
@@ -297,7 +304,7 @@ num_basis = 4
 def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     fft_bdelta_0 = k_slc
     Nx, Ny, Nz, Nc, Nb = fft_bdelta_0.shape
-    sens_maps_expand = get_sens_by(np.zeros((Nx, Ny, Nz, Nc)), k_pparef_slc)  # use first b=0 for sens est
+    sens_maps_expand = get_sens_by(fft_bdelta_0[..., 0], k_pparef_slc)  # use first b=0 for sens est
     num_x, num_y, num_z, num_c, num_b = k_slc.shape
     sense_prelim = np.zeros((num_x, num_y, num_b), dtype=np.complex128)
 
@@ -311,7 +318,7 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
             fft_bdelta_0[..., i], sens_maps_expand
         )
 
-    _composite_sens, _ = utils.get_composite_sens(
+    _composite_sens, phase = utils.get_composite_sens(
         sense_prelim, sens_maps_expand, bvals=BVALS, visualize="True"
     )
     composite_sens = np.expand_dims(
@@ -328,7 +335,7 @@ def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
         lambda1=0.001,
         lambda2=0.001,
     )
-    return recon_fmac_basis, recon, sense_prelim[:,:,None, :]
+    return recon_fmac_basis, recon, sense_prelim[:,:,None, :], sens_maps_expand, _composite_sens, phase
 
 
 
@@ -336,15 +343,26 @@ num_x, num_y, num_z, num_c, num_b = k.shape
 recon_fmac_basis = np.zeros((num_x, num_y, num_z, 1, 1, num_b), dtype=np.complex128)
 recons = np.zeros((num_x, num_y, num_z,1, 1, 1, num_basis), dtype=np.complex128)
 sense_prelim_all = np.zeros((num_x, num_y, num_z, num_b), dtype=np.complex128)
+sensitivity_maps_all = np.zeros((num_x, num_y, num_z, num_c), dtype=np.complex128)
+composite_sens_all = np.zeros((num_x, num_y, num_z, num_c, num_b), dtype=np.complex128)
+phase_all = np.zeros((num_x, num_y, num_z, num_b), dtype=np.complex128)
 for slc in tqdm(range(num_z)):
-    tmp, recon, sense_prelim = run_pipeline_invivo(k[:,:, slc:slc+1,:,:], k_pparef[:,:, slc:slc+1,:], basis)
+    tmp, recon, sense_prelim, sens_maps_expand, _composite_sens, phase = run_pipeline_invivo(k[:,:, slc:slc+1,:,:], k_pparef[:,:, slc:slc+1,:], basis)
     recon_fmac_basis[:,:,slc:slc+1,:,:,:] = tmp
     recons[:,:,slc:slc+1,:,:,:] = recon
     sense_prelim_all[:,:,slc:slc+1,:] = sense_prelim
+    sensitivity_maps_all[:,:,slc:slc+1,:] = sens_maps_expand
+    composite_sens_all[:,:,slc:slc+1,:,:] = np.transpose(_composite_sens, (0,1,4,2,3))
+    phase_all[:,:,slc:slc+1,:] = phase[:,:,None,:]
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
 filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}_subonly1"
+filename_pref = filename_pref + f"_{num_repeat}rep"
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
+
+save_nifti(phase_all, ps, filename=filename_pref + '_phase_estimated', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(sensitivity_maps_all, ps, filename=filename_pref + '_sensitivity_maps', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(composite_sens_all, ps, filename=filename_pref + '_composite_sens', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
 
 save_nifti(recons.squeeze(), ps, filename=filename_pref + '_coef', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
 save_nifti(sense_prelim_all.squeeze(), ps, filename=filename_pref + '_sense_prelim', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
@@ -423,3 +441,12 @@ plt.plot(recon_fmac_basis.real.squeeze()[50,50,0,:])
 plt.plot(np.abs(sense_prelim_all)[50,50,0,:])
 # %%
 vals, ind = np.unique(BVALS, return_index=True)
+
+if debug_level >= 1:
+    plot_utils.help_show_imgs(sensitivity_maps_all[:,:,0,:], cmap='jet')
+    plot_utils.help_show_imgs(np.abs(phase_all[:,:,0,:]), cmap='jet')
+    plot_utils.help_show_imgs(np.angle(phase_all[:,:,0,:]).real, cmap='jet')
+
+    plot_utils.help_show_imgs(sense_prelim_all[:,:,0,:], cmap='gray')
+    plot_utils.help_show_imgs(sense_prelim_all[:,:,0,:], cmap='jet')
+    plot_utils.help_show_imgs(recon_fmac_basis.real[:,:,0,:], cmap='gray')
