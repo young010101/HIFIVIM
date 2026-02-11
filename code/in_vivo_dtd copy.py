@@ -32,7 +32,9 @@ with open("../config.json", "r") as f:
 base = cfg["paths"]["base"]
 typ = cfg["dataset"]["type"]
 # protocol = cfg["dataset"]["protocol"]
-protocol = cfg["UIDnumber"]["ste"]
+# protocol = cfg["UIDnumber"]["ste"]
+# protocol = "22_STE_1.2mmiso_LR"
+protocol = "STEs_1.2mmiso_LR_full"
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):
@@ -56,15 +58,28 @@ if debug_level >= 1:
     print(ps.bart_p)
 POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 # bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/6_STEs_2mmiso_PA", "bval.bval"))
-bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/" + protocol, "bval.bval"))
+# bval = np.loadtxt(os.path.join("/data/users/cyang/RAWDATA_YANGCHENG/" + protocol, "bval.bval"))
+# bval = np.loadtxt("/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_STE_1.2mmiso_LR_20260207140737_2201.bval")
+# bval_p1 = np.loadtxt("/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_STEs_1.2mmiso_LR_p1_20260207140737_2301.bval")
+# bval_p2 = np.loadtxt("/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_STEs_1.2mmiso_LR_p2_20260207140737_2401.bval")
+# bval = np.concatenate((bval_p1, bval_p2), axis=0) 
+bval = np.loadtxt("/data/users/cyang/20260207_hi_res/20260207_140748_hzhai_434/bval.bval1")
+
 BVALS = bval
-vals, _ind = np.unique(BVALS, return_index=True)
-ind = np.array([], dtype=int) 
-num_repeat = 2
-for i in range(len(vals)):
-    _idx = np.where(np.isclose(bval, vals[i]))[0][:num_repeat]
-    ind = np.append(ind, _idx)
-BVALS = BVALS[ind]
+is_reorder = False
+if is_reorder:
+    vals, _ind = np.unique(BVALS, return_index=True)
+    ind = np.array([], dtype=int) 
+    num_repeat = 16 
+    for i in range(len(vals)):
+        _idx = np.where(np.isclose(bval, vals[i]))[0][:num_repeat]
+        ind = np.append(ind, _idx)
+    BVALS = BVALS[ind]
+    order_suff = "_order"
+else:
+    ind = np.arange(len(BVALS))
+    num_repeat = 16
+    order_suff = "_noorder"
 
 num_bvals = len(BVALS)
 
@@ -300,7 +315,7 @@ b_delta = 0
 ivim_dicc, basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, b_delta=b_delta, debug=True)
 
 # %%
-num_basis = 4
+num_basis = 3
 def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     fft_bdelta_0 = k_slc
     Nx, Ny, Nz, Nc, Nb = fft_bdelta_0.shape
@@ -357,38 +372,45 @@ for slc in tqdm(range(num_z)):
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
 filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}_subonly1"
-filename_pref = filename_pref + f"_{num_repeat}rep"
+filename_pref = filename_pref + f"_{num_repeat}rep" + order_suff
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
 
-save_nifti(phase_all, ps, filename=filename_pref + '_phase_estimated', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(sensitivity_maps_all, ps, filename=filename_pref + '_sensitivity_maps', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(composite_sens_all, ps, filename=filename_pref + '_composite_sens', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+ref_path = '/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_STE_1.2mmiso_LR_20260207140737_2201.nii.gz'
+save_nifti(phase_all, ps, filename=filename_pref + '_phase_estimated', ref_path=ref_path, debug_level=1)
+save_nifti(sensitivity_maps_all, ps, filename=filename_pref + '_sensitivity_maps', ref_path=ref_path, debug_level=1)
+save_nifti(composite_sens_all, ps, filename=filename_pref + '_composite_sens', ref_path=ref_path, debug_level=1)
 
-save_nifti(recons.squeeze(), ps, filename=filename_pref + '_coef', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(sense_prelim_all.squeeze(), ps, filename=filename_pref + '_sense_prelim', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(sense_prelim_all.squeeze().real, ps, filename=filename_pref + '_sense_prelim_real', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(np.abs(sense_prelim_all.squeeze()), ps, filename=filename_pref + '_sense_prelim_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(recons.squeeze(), ps, filename=filename_pref + '_coef', ref_path=ref_path, debug_level=1)
+save_nifti(sense_prelim_all.squeeze(), ps, filename=filename_pref + '_sense_prelim', ref_path=ref_path, debug_level=1)
+save_nifti(sense_prelim_all.squeeze().real, ps, filename=filename_pref + '_sense_prelim_real', ref_path=ref_path, debug_level=1)
+save_nifti(np.abs(sense_prelim_all.squeeze()), ps, filename=filename_pref + '_sense_prelim_abs', ref_path=ref_path, debug_level=1)
+save_nifti(np.rot90(np.abs(sense_prelim_all.squeeze()), k=2, axes=(0,1)), ps, filename=filename_pref + '_sense_prelim_rot180_abs', ref_path=ref_path, debug_level=1)
 b0 = np.abs(sense_prelim_all.squeeze())[..., 0] + 1e-8  # avoid div by zero
-save_nifti(np.abs(sense_prelim_all.squeeze()) / b0[..., None], ps, filename=filename_pref + '_sense_prelim_abs_removeb0', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
+save_nifti(np.abs(sense_prelim_all.squeeze()) / b0[..., None], ps, filename=filename_pref + '_sense_prelim_abs_removeb0', ref_path=ref_path, debug_level=1)
 
-save_nifti(recon_fmac_basis.squeeze(), ps, filename=filename_pref, ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(recon_fmac_basis.real.squeeze(), ps, filename=filename_pref + '_real', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-save_nifti(np.abs(recon_fmac_basis).squeeze(), ps, filename=filename_pref + '_abs', ref_path=os.path.join(ps.ip, "out.nii"), debug_level=1)
-
-stes_ref = os.path.join(ps.ip, "_STEs_2mmiso_PA_20260118122029_601_slc34.nii.gz")
+save_nifti(recon_fmac_basis.squeeze(), ps, filename=filename_pref, ref_path=ref_path, debug_level=1)
+save_nifti(recon_fmac_basis.real.squeeze(), ps, filename=filename_pref + '_real', ref_path=ref_path, debug_level=1)
+save_nifti(np.abs(recon_fmac_basis).squeeze(), ps, filename=filename_pref + '_abs', ref_path=ref_path, debug_level=1)
+# stes_ref = os.path.join(ps.ip, "_STEs_2mmiso_PA_20260118122029_601_slc34.nii.gz")
+stes_ref = ref_path
 
 recon_fmac_basis2_rot180 = np.rot90(recon_fmac_basis.squeeze(), k=2, axes=(0,1))
 save_nifti(recon_fmac_basis2_rot180, ps, filename=filename_pref + '_rot180', ref_path=stes_ref, debug_level=1)
 
-recon_fmac_basis2_rot180_norm1759 = np.abs(recon_fmac_basis2_rot180) * 1759 / np.max(recon_fmac_basis2_rot180.real)
-save_nifti(recon_fmac_basis2_rot180_norm1759, ps, filename=filename_pref + '_rot180_norm1759'+'_abs', ref_path=stes_ref, debug_level=1)
-recon_fmac_basis2_rot180_norm1759 =  recon_fmac_basis2_rot180.real * 1759 / np.max(recon_fmac_basis2_rot180.real)
-save_nifti(recon_fmac_basis2_rot180_norm1759, ps, filename=filename_pref + '_rot180_norm1759' + '_real', ref_path=stes_ref, debug_level=1)
+recon_fmac_basis2_rot90 = np.rot90(recon_fmac_basis.squeeze(), k=1, axes=(0,1))
+save_nifti(recon_fmac_basis2_rot90, ps, filename=filename_pref + '_rot90', ref_path=stes_ref, debug_level=1)
 
-recon_fmac_basis2_rot180_norm = np.abs(recon_fmac_basis2_rot180) / np.max(recon_fmac_basis2_rot180.real)
-save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm'+'_abs', ref_path=stes_ref, debug_level=1)
-recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180.real / np.max(recon_fmac_basis2_rot180.real)
-save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm' + '_real', ref_path=stes_ref, debug_level=1)
+recon_fmac_basis2_rot270 = np.rot90(recon_fmac_basis.squeeze(), k=3, axes=(0,1))
+save_nifti(recon_fmac_basis2_rot270, ps, filename=filename_pref + '_rot270', ref_path=stes_ref, debug_level=1)
+# recon_fmac_basis2_rot180_norm1759 = np.abs(recon_fmac_basis2_rot180) * 1759 / np.max(recon_fmac_basis2_rot180.real)
+# save_nifti(recon_fmac_basis2_rot180_norm1759, ps, filename=filename_pref + '_rot180_norm1759'+'_abs', ref_path=stes_ref, debug_level=1)
+# recon_fmac_basis2_rot180_norm1759 =  recon_fmac_basis2_rot180.real * 1759 / np.max(recon_fmac_basis2_rot180.real)
+# save_nifti(recon_fmac_basis2_rot180_norm1759, ps, filename=filename_pref + '_rot180_norm1759' + '_real', ref_path=stes_ref, debug_level=1)
+
+# recon_fmac_basis2_rot180_norm = np.abs(recon_fmac_basis2_rot180) / np.max(recon_fmac_basis2_rot180.real)
+# save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm'+'_abs', ref_path=stes_ref, debug_level=1)
+# recon_fmac_basis2_rot180_norm =  recon_fmac_basis2_rot180.real / np.max(recon_fmac_basis2_rot180.real)
+# save_nifti(recon_fmac_basis2_rot180_norm, ps, filename=filename_pref + '_rot180_norm' + '_real', ref_path=stes_ref, debug_level=1)
 
 b0 = recon_fmac_basis2_rot180[..., 0] + 1e-8  # avoid div by zero
 recon_fmac_basis2_rot180_norm_removeb0 = np.abs(recon_fmac_basis2_rot180) / b0[..., None] 
@@ -449,4 +471,22 @@ if debug_level >= 1:
 
     plot_utils.help_show_imgs(sense_prelim_all[:,:,0,:], cmap='gray')
     plot_utils.help_show_imgs(sense_prelim_all[:,:,0,:], cmap='jet')
-    plot_utils.help_show_imgs(recon_fmac_basis.real[:,:,0,:], cmap='gray')
+    plot_utils.help_show_imgs(recon_fmac_basis.real.squeeze()[:,:,0,:], cmap='gray')
+
+
+# %%
+if debug_level >= 1:
+    fft_bdelta_0 = k[:,:, slc:slc+1,:,:]
+    Nx, Ny, Nz, Nc, Nb = fft_bdelta_0.shape
+    k_acs_size = k_pparef.shape
+    if 1:
+        mbref_embed = utils.embed_center(k_pparef[:,:, slc:slc+1,:], np.zeros((Nx, Ny, Nz, Nc)))
+    else:
+        k_slc = fft_bdelta_0[..., 0]
+        mbref_embed = utils.embed_center(k_pparef[:,:, slc:slc+1,:], k_slc)
+    # use 0.99, better
+    if 1:
+        sens_fft_bdelta_0_by_bart = bart_retry(1, "ecalib -m1", mbref_embed)
+    else:
+        sens_fft_bdelta_0_by_bart = bart_retry(1, "ecalib -m1 -r 32", mbref_embed)
+    plot_utils.help_show_imgs(sens_fft_bdelta_0_by_bart.squeeze(), cmap='jet')
