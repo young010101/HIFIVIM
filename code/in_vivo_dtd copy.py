@@ -34,7 +34,8 @@ typ = cfg["dataset"]["type"]
 # protocol = cfg["dataset"]["protocol"]
 # protocol = cfg["UIDnumber"]["ste"]
 # protocol = "22_STE_1.2mmiso_LR"
-protocol = "STEs_1.2mmiso_LR_full"
+# protocol = "STEs_1.2mmiso_LR_full"
+protocol = "21_LTE_1.2mmiso_LR"
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):
@@ -63,7 +64,8 @@ POINTS = [(82, 82), (50, 50), (30, 130), (100, 60), (45, 90)]
 # bval_p1 = np.loadtxt("/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_STEs_1.2mmiso_LR_p1_20260207140737_2301.bval")
 # bval_p2 = np.loadtxt("/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_STEs_1.2mmiso_LR_p2_20260207140737_2401.bval")
 # bval = np.concatenate((bval_p1, bval_p2), axis=0) 
-bval = np.loadtxt("/data/users/cyang/20260207_hi_res/20260207_140748_hzhai_434/bval.bval1")
+bval = np.loadtxt("/data/users/cyang/20260207_hi_res/20260207_140748_hzhai_434/bval.bval1") # STEs after concatenation
+bval = np.loadtxt("/data/users/cyang/20260207_hi_res/hzhai_20260207_phantom_140748/NII/_LTE_1.2mmiso_LR_20260207140737_2101.bval")
 
 BVALS = bval
 is_reorder = False
@@ -371,7 +373,7 @@ for slc in tqdm(range(num_z)):
     phase_all[:,:,slc:slc+1,:] = phase[:,:,None,:]
 #%% Ensure output directory exists before writing CFL
 os.makedirs(ps.bart_p, exist_ok=True)
-filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}_subonly1"
+filename_pref = protocol + f"_{num_basis}basis_bdelta{b_delta}"
 filename_pref = filename_pref + f"_{num_repeat}rep" + order_suff
 cfl.writecfl(os.path.join(ps.bart_p, filename_pref), recon_fmac_basis)
 
