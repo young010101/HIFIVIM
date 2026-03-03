@@ -34,8 +34,9 @@ typ = cfg["dataset"]["type"]
 # protocol = cfg["dataset"]["protocol"]
 # protocol = cfg["UIDnumber"]["ste"]
 # protocol = "22_STE_1.2mmiso_LR"
-# protocol = "STEs_1.2mmiso_LR_full"
-protocol = "21_LTE_1.2mmiso_LR"
+protocol = "STEs_1.2mmiso_LR_full"
+# protocol = "STEs_1_2mmiso_LR_full"
+# protocol = "21_LTE_1.2mmiso_LR"
 debug_level = cfg["debug"]["level"]
 
 def render(rel_tmpl):
@@ -317,7 +318,7 @@ b_delta = 0
 ivim_dicc, basis = dict_gen_dtd.basis_pipeline(bvals=BVALS, num_basis=5, b_delta=b_delta, debug=True)
 
 # %%
-num_basis = 3
+num_basis = 5
 def run_pipeline_invivo(k_slc, k_pparef_slc, basis):
     fft_bdelta_0 = k_slc
     Nx, Ny, Nz, Nc, Nb = fft_bdelta_0.shape

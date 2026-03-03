@@ -357,3 +357,43 @@ for ax in axes.flatten():
 plt.savefig(f"../figs/{''.join(names_dict.keys())}_coeff.png", dpi=300)
 plt.show()
 # %%
+p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
+names_dict = {
+    "STE_4basis_only1": "STEs_1_2mmiso_LR_full_5basis_bdelta0_16rep_noorder_coef.nii.gz",
+}
+names = names_dict.values()
+n_cols = len(names)
+
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+
+font_style = {
+    "fontsize": 16,
+    "fontweight": "bold",
+}
+idx_slc = 0
+# fig, axes = plt.subplots(Nb, n_cols, figsize=(6*n_cols, 6*Nb), gridspec_kw={"hspace": 0, "wspace": 0})
+fig, axes = plt.subplots(1,5, figsize=(6, 6*5))
+
+num_basis = imgs[i].shape[3]
+for j in range(num_basis):
+    ax = axes[j]
+    im = ax.imshow(np.rot90(imgs[0][:, :, idx_slc, j], k=-1), cmap="gray")
+    # plt.colorbar(im)
+    # if j == 0:
+    #     ax.set_title(f"{list(names_dict.keys())[0]}", pad=12, **font_style)
+    # if i == 0:
+    #     ax.set_ylabel(f"C$_{j+1}$", **font_style)
+
+# axes[0, 0].set_ylabel("Magnitude ($I_0$)", **font_style)
+
+for ax in axes.flatten():
+    # ax.axis("off")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+# plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+plt.savefig(f"../figs/paper_{''.join(names_dict.keys())}_coeff.png", dpi=300)
+plt.show()
+# %%
