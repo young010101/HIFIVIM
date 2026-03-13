@@ -5,7 +5,7 @@ import nibabel as nib
 from pathlib import Path
 import mdm
 import glob
-
+import matplotlib.gridspec as gridspec
 # %% ======================compare reconstructions======================
 p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain_2mmiso/NII")
 names_dict = {
@@ -52,6 +52,75 @@ for ax in axes.flatten():
 
 # plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 plt.savefig(f"../figs/{''.join(names_dict.keys())}.png", dpi=300)
+plt.show()
+# %%
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import nibabel as nib
+from pathlib import Path
+
+p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain_2mmiso/NII")
+
+names_dict = {
+    "Conventional": "_STEs_2mmiso_PA_20260118122029_601_slc37_36_rot180_sorted_pa.nii.gz",
+    "Proposed": "6_STEs_2mmiso_PA_sense_prelim_all_abs_pa.nii.gz"
+}
+names = list(names_dict.values())
+keys = list(names_dict.keys())
+n_cols = len(names)
+
+# ������������������������ mdm
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+# �������������� b ��������3������������
+unique_b = np.unique(np.round(ss[0].xps.b / 10**6))
+if len(unique_b) >= 3:
+    b_s_mm2 = [unique_b[0], unique_b[len(unique_b)//2], unique_b[-1]]
+else:
+    b_s_mm2 = unique_b
+
+Nb = len(b_s_mm2)
+
+# --- ���� 1: �������� ---
+font_style = {
+    "fontsize": 24,  # �� 16 �������� 24���������������������� 28 �� 32
+    "fontweight": "bold",
+}
+idx_slc = 0
+
+fig = plt.figure(figsize=(6 * n_cols + 1, 6 * Nb))
+width_ratios = [1] * n_cols + [0.05, 0.1]
+gs = gridspec.GridSpec(Nb, n_cols + 2, width_ratios=width_ratios, wspace=0.0, hspace=0.0)
+
+for j in range(Nb):
+    im = None
+    for i in range(n_cols):
+        ax = fig.add_subplot(gs[j, i])
+        
+        idx = np.where(np.isclose(ss[i].xps.b / 10**6, b_s_mm2[j], atol=0.1))[0][0]
+        
+        img_slice = np.rot90(imgs[i][:, :, idx_slc, idx], k=-1)
+        im = ax.imshow(img_slice, cmap="gray")
+        
+        if j == 0:
+            ax.set_title(keys[i], pad=16, **font_style) # pad ����������������������������������������
+        if i == 0:
+            ax.set_ylabel(f"b = {b_s_mm2[j]:.0f} s/mm$^2$", **font_style)
+            
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    if im is not None:
+        cax = fig.add_subplot(gs[j, -1])
+        cbar = fig.colorbar(im, cax=cax)
+        # --- ���� 2: ���� colorbar ������ ---
+        cbar.set_ticks([]) 
+
+save_path = f"../figs/Conventional_Proposed_bvals.png"
+plt.savefig(save_path, dpi=300, bbox_inches='tight')
+print(f"Figure saved to: {save_path}")
 plt.show()
 # %% =====================signal decay w/o LTE======================
 points_dict = {"csf": (46, 52), "wm": (40, 40), "gm": (30, 35)}
