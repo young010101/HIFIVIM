@@ -203,58 +203,103 @@ for ax in axes.flatten():
 plt.savefig(f"../figs/{''.join(worth_view_dict.keys())}_maps.png", dpi=300)
 plt.show()
 # %% !!paper
-cmap='inferno'
+import glob
+from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import nibabel as nib
+import numpy as np
+
+# --- �������� ---
+cmap = 'inferno'
 worth_view_dict = {
-		"STEs All Bases": "lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
-		"STEs 4 Bases": "lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0",
-		"STE 20 Bases": "lte_sense_rot180_norm_removeb0_ste_basis20_real_removeb0",
-		"STEs 4 Bases 1 Rep": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0subonly1",
-		"STE 4 Bases 1 Rep": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0_subonly1_bak",
+    "STEs All Bases": "lte_sense_rot180_norm_removeb0stes_sens_abs_removeb0",
+    "STEs 4 Bases": "lte_sense_rot180_norm_removeb0_stes_basis4_real_removeb0",
+    "STE 20 Bases": "lte_sense_rot180_norm_removeb0_ste_basis20_real_removeb0",
+    "STEs 4 Bases 1 Rep": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0subonly1",
+    "STE 4 Bases 1 Rep": "lte_sense_rot180_norm_removeb0_ste_basis4_real_removeb0_subonly1_bak",
 }
 worth_view = list(worth_view_dict.values())
 directory_root = Path('/data/users/cyang/dtd_subspace/0119_ngc/processed/brain_2mmiso')
-dtd_items_names_dict = {'dtd_gamma_MD':(0,4), 'dtd_gamma_Va':(0, 3), 'dtd_gamma_Vi':(0, 3)}
-dtd_items_names_dict_ylabel = {'dtd_gamma_MD': 'MD', 'dtd_gamma_Va': '$V_a$', 'dtd_gamma_Vi': "$V_i$"}
-dtd_items_names = list(dtd_items_names_dict.keys()) 
-n_rows = len(dtd_items_names)
-names = worth_view
-n_cols = len(names)
 
+# ��������MD, Vi, Va
+dtd_items_names_dict = {
+    'dtd_gamma_MD':(0,4),
+    'dtd_gamma_Vi':(0, 3), 
+    'dtd_gamma_Va':(0, 3)
+}
+dtd_items_names_dict_ylabel = {
+    'dtd_gamma_MD': 'MD', 
+    'dtd_gamma_Vi': "$V_I$", 
+    'dtd_gamma_Va': '$V_A$'
+}
+dtd_items_names_ordered = list(dtd_items_names_dict.keys()) 
+
+n_rows = len(dtd_items_names_ordered)
+n_cols = len(worth_view)
 idx_slc = 0
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 5*n_rows))
+
+# --- ���� GridSpec ---
+# ���������������������������������� colorbar ��
+fig = plt.figure(figsize=(5 * n_cols + 1, 5 * n_rows))
+
+# ����������������������������
+# �� n_cols ������������ 1 (�������� MRI ��������)
+# ������������ 0.05 (���������� colorbar ��������������)
+# ���������� 0.1 (���������� colorbar)
+width_ratios = [1] * n_cols + [0.05, 0.1]
+
+# ������������������������ wspace �� hspace �� 0
+gs = gridspec.GridSpec(n_rows, n_cols + 2, width_ratios=width_ratios, wspace=0.0, hspace=0.0)
 
 font_style = {
     "fontsize": 24,
     "fontweight": "bold",
 }
 
-for i, name in enumerate(worth_view):
-    src_dir = directory_root / name
-    pattern = str(src_dir / '*.nii*')
-    j = 0
-    for fp in glob.glob(pattern):
-        f = Path(fp)
-        if any(k in f.name for k in dtd_items_names):
-            k = [k for k in dtd_items_names if k in f.name]
-            k = k[0]
-            ax = axes[j, i]
-            if j == 0:
-                ax.set_title(f"{list(worth_view_dict.keys())[i]}", **font_style)
-            if i == 0:
-                ax.set_ylabel(f"{dtd_items_names_dict_ylabel[k]}", **font_style)
+for j, metric_key in enumerate(dtd_items_names_ordered):
+    im = None  # ������������������������
+    
+    for i, folder_name in enumerate(worth_view):
+        src_dir = directory_root / folder_name
+        pattern = str(src_dir / '*.nii*')
+        matched_files = [f_path for f_path in glob.glob(pattern) if metric_key in Path(f_path).name]
+        
+        # ��������������������������
+        ax = fig.add_subplot(gs[j, i])
+        
+        # ����������������
+        if j == 0:
+            ax.set_title(f"{list(worth_view_dict.keys())[i]}", **font_style)
+        
+        # ������������ Y ������
+        if i == 0:
+            ax.set_ylabel(f"{dtd_items_names_dict_ylabel[metric_key]}", **font_style)
+            
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        if matched_files:
+            f = Path(matched_files[0])
             img = nib.load(f).get_fdata()
             img = np.rot90(img, k=1)
-            vmin, vmax = dtd_items_names_dict[k]
-            im = ax.imshow(img[:, :, 0], cmap=cmap, vmin=vmin, vmax=vmax)
-            j += 1
-            fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+            vmin, vmax = dtd_items_names_dict[metric_key]
+            
+            im = ax.imshow(img[:, :, idx_slc], cmap=cmap, vmin=vmin, vmax=vmax)
+        else:
+            print(f"Warning: File for {metric_key} not found in folder {folder_name}")
+            ax.axis('off')
 
-for ax in axes.flatten():
-    # ax.axis("off")
-    ax.set_xticks([])
-    ax.set_yticks([])
+    # ���������������� (gs[j, -1]) �������� colorbar
+    if im is not None:
+        cax = fig.add_subplot(gs[j, -1])
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.ax.tick_params(labelsize=18) # ���� colorbar ������������
 
-plt.savefig(f"../figs/paper_{''.join(worth_view_dict.keys())}_maps.png", dpi=300)
+base_filenames = ''.join(worth_view_dict.keys()).replace(' ', '_')
+save_path = f"../figs/paper_{base_filenames}_maps.png"
+plt.savefig(save_path, dpi=300, bbox_inches='tight')
+print(f"Figure saved to: {save_path}")
 plt.show()
 # %%
 
