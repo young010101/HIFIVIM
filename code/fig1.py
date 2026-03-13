@@ -356,6 +356,60 @@ for ax in axes.flatten():
 # plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 plt.savefig(f"../figs/{''.join(names_dict.keys())}_coeff.png", dpi=300)
 plt.show()
+# %% gemini
+p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain_2mmiso/NII")
+
+# Keep only the first item from the dictionary
+full_names_dict = {
+    "STE_4basis_only1": "4_STE_2mmiso_PA_4basis_bdelta0_subonly1_coef.nii.gz",
+    "STEs_4basis_only1": "6_STEs_2mmiso_PA_4basis_bdelta0_subonly1_coef.nii.gz",
+    "STE_2basis_full": "4_STE_2mmiso_PA_2basis_bdelta0_bak_coef.nii.gz",
+}
+first_key = list(full_names_dict.keys())[0]
+names_dict = {first_key: full_names_dict[first_key]}
+
+names = list(names_dict.values())
+n_cols = len(names) # Will be 1
+
+# Assuming mdm is already imported/available in your environment
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+font_style = {
+    "fontsize": 16,
+    "fontweight": "bold",
+}
+idx_slc = 0
+num_basis = imgs[0].shape[3]
+
+# Create subplots for 1 column
+fig, axes = plt.subplots(num_basis, n_cols, figsize=(6 * n_cols, 6 * num_basis))
+
+# If n_cols is 1, axes is a 1D array. We handle that here:
+for i in range(n_cols):
+    img = imgs[i]
+    for j in range(num_basis):
+        # Indexing logic for a single column
+        ax = axes[j] if n_cols == 1 else axes[j, i]
+        
+        im = ax.imshow(np.rot90(img[:, :, idx_slc, j], k=-1), cmap="gray")
+        
+        # Colorbar removed as requested
+        
+        if j == 0:
+            ax.set_title(f"{list(names_dict.keys())[i]}", pad=12, **font_style)
+        
+        # Y-label remains on the left for each basis component
+        ax.set_ylabel(f"C$_{j+1}$", **font_style)
+
+# Clean up ticks
+for ax in (axes if n_cols == 1 else axes.flatten()):
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+plt.tight_layout()
+plt.savefig(f"../figs/{list(names_dict.keys())[0]}_coeff_single.png", dpi=300)
+plt.show( )
 # %%
 p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
 names_dict = {
