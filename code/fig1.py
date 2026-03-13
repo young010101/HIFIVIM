@@ -383,33 +383,35 @@ idx_slc = 0
 num_basis = imgs[0].shape[3]
 
 # Create subplots for 1 column
-fig, axes = plt.subplots(num_basis, n_cols, figsize=(6 * n_cols, 6 * num_basis))
+# ... (previous data loading code)
 
-# If n_cols is 1, axes is a 1D array. We handle that here:
-for i in range(n_cols):
-    img = imgs[i]
-    for j in range(num_basis):
-        # Indexing logic for a single column
-        ax = axes[j] if n_cols == 1 else axes[j, i]
-        
-        im = ax.imshow(np.rot90(img[:, :, idx_slc, j], k=-1), cmap="gray")
-        
-        # Colorbar removed as requested
-        
-        if j == 0:
-            ax.set_title(f"{list(names_dict.keys())[i]}", pad=12, **font_style)
-        
-        # Y-label remains on the left for each basis component
-        ax.set_ylabel(f"C$_{j+1}$", **font_style)
+# num_basis = imgs[0].shape[3]
+fig, axes = plt.subplots(num_basis, 1, figsize=(6, 6 * num_basis), 
+                         gridspec_kw={'hspace': 0, 'wspace': 0})
 
-# Clean up ticks
-for ax in (axes if n_cols == 1 else axes.flatten()):
-    ax.set_xticks([])
-    ax.set_yticks([])
+# Ensure axes is iterable even if num_basis is 1
+if num_basis == 1:
+    axes = [axes]
 
-plt.tight_layout()
-plt.savefig(f"../figs/{list(names_dict.keys())[0]}_coeff_single.png", dpi=300)
-plt.show( )
+for j in range(num_basis):
+    ax = axes[j]
+    # Display image
+    im = ax.imshow(np.rot90(imgs[0][:, :, idx_slc, j], k=-1), cmap="gray")
+    
+    # Remove all axis lines and ticks to make them seamless
+    ax.axis("off") 
+    
+    # If you still want the "C_j" labels, use ax.text instead of ylabel 
+    # because ylabel requires space that creates gaps.
+    ax.text(0.02, 0.5, f"C$_{j+1}$", transform=ax.transAxes, 
+            color="white", va="center", **font_style)
+
+# Remove all margins
+plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
+
+plt.savefig(f"../figs/{list(names_dict.keys())[0]}_seamless.png", 
+            dpi=300, bbox_inches='tight', pad_inches=0)
+plt.show()
 # %%
 p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
 names_dict = {
