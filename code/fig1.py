@@ -526,6 +526,66 @@ plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
 plt.savefig(f"../figs/{list(names_dict.keys())[0]}_seamless.png", 
             dpi=300, bbox_inches='tight', pad_inches=0)
 plt.show()
+# %% coefficient maps for paper by gemini
+import numpy as np
+import matplotlib.pyplot as plt
+import nibabel as nib
+from pathlib import Path
+
+# Assuming mdm is imported in your environment
+# cmap = 'inferno' # Assuming this is defined from your earlier cells
+
+p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain_2mmiso/NII")
+
+# Keep only the first item from the dictionary
+full_names_dict = {
+    "STE_4basis_only1": "4_STE_2mmiso_PA_4basis_bdelta0_subonly1_coef.nii.gz",
+    "STEs_4basis_only1": "6_STEs_2mmiso_PA_4basis_bdelta0_subonly1_coef.nii.gz",
+    "STE_2basis_full": "4_STE_2mmiso_PA_2basis_bdelta0_bak_coef.nii.gz",
+}
+first_key = list(full_names_dict.keys())[0]
+names_dict = {first_key: full_names_dict[first_key]}
+
+names = list(names_dict.values())
+
+ss = [mdm.mdm_s_from_nii(p / name, 0) for name in names]
+imgs = [nib.load(s.nii_fn).get_fdata() for s in ss]
+
+font_style = {
+    "fontsize": 24, # Bumped up slightly based on your earlier preferences
+    "fontweight": "bold",
+}
+idx_slc = 0
+num_basis = imgs[0].shape[3]
+
+# --- CHANGED: 1 row, num_basis columns. Swapped figsize order. ---
+fig, axes = plt.subplots(1, num_basis, figsize=(6 * num_basis, 6), 
+                         gridspec_kw={'hspace': 0, 'wspace': 0})
+
+# Ensure axes is iterable even if num_basis is 1
+if num_basis == 1:
+    axes = [axes]
+
+for j in range(num_basis):
+    ax = axes[j]
+    
+    # --- CHANGED: use the cmap variable instead of "gray" ---
+    im = ax.imshow(np.rot90(imgs[0][:, :, idx_slc, j], k=-1), cmap=cmap)
+    
+    # Remove all axis lines and ticks to make them seamless
+    ax.axis("off") 
+    
+    # Text placement: moved to the top-left (0.05, 0.90) since a horizontal layout 
+    # usually looks better with corner labels rather than middle labels.
+    ax.text(0.05, 0.90, f"C$_{{{j+1}}}$", transform=ax.transAxes, 
+            color="white", va="top", **font_style)
+
+# Remove all margins
+plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
+
+plt.savefig(f"../figs/{first_key}_seamless.png", 
+            dpi=300, bbox_inches='tight', pad_inches=0)
+plt.show()
 # %%
 p = Path("/data/users/cyang/dtd_subspace/0119_ngc/DATA/brain/NII")
 names_dict = {
